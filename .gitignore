@@ -1,0 +1,23 @@
+# Build artifacts
+*.o
+*.a
+*.elf
+*.hex
+*.bin
+*.map
+
+# Compiled binaries in the source tree
+bench/bin/
+examples/bin/
+sim/bin/
+tests/bin/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build directories
+build/
+cmake-build-*/
