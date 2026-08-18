@@ -1,0 +1,1156 @@
+# PIDX cross-language conformance scenarios.
+# Format: see ports/SPEC_conformance.md
+#
+# Coverage intent: every stage of pidp_run, every anti-windup mode, both
+# integration methods, all three derivative modes, the shaper, the input
+# filter, safety/fault/recovery, gain scheduling, and each of the nine defects
+# fixed in the C library (a port that reintroduces one will diverge here).
+
+# ---------------------------------------------------------------- 01 basics
+scenario p_only
+gains 2 0 0
+dt 0.1
+init
+sp 1
+u 0 0.1
+u 0.2 0.1
+u 0.5 0.1
+u 0.9 0.1
+u 1.0 0.1
+u 1.1 0.1
+end
+
+scenario pi_backward
+gains 1.5 0.8 0
+dt 0.05
+init
+sp 10
+u 0 0.05
+u 1 0.05
+u 2.5 0.05
+u 4 0.05
+u 6 0.05
+u 8 0.05
+u 9.5 0.05
+u 10 0.05
+u 10.4 0.05
+end
+
+scenario pi_trapezoidal
+gains 1.5 0.8 0
+dt 0.05
+integration 1
+init
+sp 10
+u 0 0.05
+u 1 0.05
+u 2.5 0.05
+u 4 0.05
+u 6 0.05
+u 8 0.05
+u 9.5 0.05
+u 10 0.05
+u 10.4 0.05
+end
+
+scenario pid_filtered
+gains 3 1.2 0.4
+dt 0.02
+tf 0.05
+init
+sp 5
+u 0 0.02
+u 0.4 0.02
+u 1.1 0.02
+u 2.2 0.02
+u 3.4 0.02
+u 4.3 0.02
+u 4.9 0.02
+u 5.2 0.02
+u 5.1 0.02
+u 5.0 0.02
+end
+
+# Tf derived from N: Tf = Kd/(N*Kp) = 0.4/(10*3)
+scenario pid_nfilter
+gains 3 1.2 0.4
+dt 0.02
+nfilter 10
+init
+sp 5
+u 0 0.02
+u 0.4 0.02
+u 1.1 0.02
+u 2.2 0.02
+u 3.4 0.02
+u 4.3 0.02
+end
+
+# Kp=0 makes Tf=Kd/(N*Kp) undefined -> unfiltered derivative, not a divide.
+scenario id_only_no_tf
+gains 0 1.0 0.5
+dt 0.02
+nfilter 10
+init
+sp 1
+u 0 0.02
+u 0.1 0.02
+u 0.3 0.02
+u 0.6 0.02
+end
+
+# ------------------------------------------------------- 02 derivative modes
+scenario deriv_on_error
+gains 2 0 0.3
+dt 0.05
+tf 0.1
+dmode 1
+init
+sp 0
+u 0 0.05
+sp 4
+u 0 0.05
+u 1 0.05
+u 2.5 0.05
+u 3.8 0.05
+end
+
+scenario deriv_weighted
+gains 2 0 0.3
+dt 0.05
+tf 0.1
+dmode 2
+weights 1 0.5
+init
+sp 0
+u 0 0.05
+sp 4
+u 0 0.05
+u 1 0.05
+u 2.5 0.05
+u 3.8 0.05
+end
+
+scenario deriv_on_meas_setpoint_step
+gains 2 0 0.3
+dt 0.05
+tf 0.1
+dmode 0
+init
+sp 0
+u 0 0.05
+sp 4
+u 0 0.05
+u 1 0.05
+u 2.5 0.05
+end
+
+# --------------------------------------------------------- 03 setpoint weight
+scenario beta_2dof
+gains 4 1 0.2
+dt 0.05
+tf 0.02
+weights 0.4 0
+outlim -20 20
+init
+sp 3
+u 0 0.05
+u 0.5 0.05
+u 1.4 0.05
+u 2.3 0.05
+u 2.9 0.05
+u 3.1 0.05
+end
+
+# -------------------------------------------------------- 04 anti-windup: all
+scenario aw_none
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 0 0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.3 0.1
+u 0.4 0.1
+u 0.5 0.1
+sp 0
+u 0.5 0.1
+u 0.4 0.1
+u 0.3 0.1
+u 0.2 0.1
+u 0.1 0.1
+u 0 0.1
+end
+
+scenario aw_clamp
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 1 0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.3 0.1
+u 0.4 0.1
+u 0.5 0.1
+sp 0
+u 0.5 0.1
+u 0.4 0.1
+u 0.3 0.1
+u 0.2 0.1
+u 0.1 0.1
+u 0 0.1
+end
+
+# Defect #1 was AW_CONDITIONAL dead code: the rollback must actually happen
+# and must be able to pull the output back inside the limits.
+scenario aw_conditional
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 2 0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.3 0.1
+u 0.4 0.1
+u 0.5 0.1
+sp 0
+u 0.5 0.1
+u 0.4 0.1
+u 0.3 0.1
+u 0.2 0.1
+u 0.1 0.1
+u 0 0.1
+end
+
+scenario aw_conditional_escape
+gains 1 5 0
+dt 0.1
+outlim -2 2
+aw 2 0
+init
+sp 5
+u 0 0.1
+u 0 0.1
+u 0 0.1
+sp -5
+u 0 0.1
+u 0 0.1
+u 0 0.1
+end
+
+scenario aw_back_calculation
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 3 0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.3 0.1
+u 0.4 0.1
+u 0.5 0.1
+sp 0
+u 0.5 0.1
+u 0.4 0.1
+u 0.3 0.1
+u 0.2 0.1
+u 0.1 0.1
+u 0 0.1
+end
+
+# Kt explicit rather than derived, and with a derivative term so the default
+# Kt=sqrt(Ki/Kd) branch is also exercised in the next scenario.
+scenario aw_back_calc_kt
+gains 2 3 0.5
+dt 0.1
+tf 0.05
+outlim -1 1
+aw 3 4.0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.4 0.1
+u 0.8 0.1
+end
+
+scenario aw_back_calc_default_kt
+gains 2 3 0.5
+dt 0.1
+tf 0.05
+outlim -1 1
+aw 3 0
+init
+sp 10
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.4 0.1
+u 0.8 0.1
+end
+
+# BACK_CALCULATION without any limit must be rejected at init with rc=5.
+scenario aw_back_calc_no_limits
+gains 2 3 0
+dt 0.1
+aw 3 0
+init
+end
+
+scenario aw_tracking
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 4 2.0
+init
+sp 10
+track 0.25
+u 0 0.1
+u 0.1 0.1
+u 0.2 0.1
+u 0.3 0.1
+track -0.5
+u 0.4 0.1
+u 0.5 0.1
+end
+
+scenario aw_tracking_via_input
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 4 2.0
+init
+sp 10
+uex 0 0.1 nan nan 0.3 nan
+uex 0.1 0.1 nan nan 0.3 nan
+uex 0.2 0.1 nan nan nan nan
+uex 0.3 0.1 nan nan -0.2 nan
+end
+
+# ------------------------------------------------------ 05 integral shaping
+scenario integral_separation
+gains 1 2 0
+dt 0.1
+separation 3
+init
+sp 10
+u 0 0.1
+u 2 0.1
+u 5 0.1
+u 7.5 0.1
+u 8.5 0.1
+u 9.5 0.1
+u 10 0.1
+end
+
+scenario integral_deadband
+gains 1 2 0
+dt 0.1
+deadband 0.5
+init
+sp 10
+u 9 0.1
+u 9.4 0.1
+u 9.7 0.1
+u 9.9 0.1
+u 10 0.1
+u 10.2 0.1
+end
+
+scenario integral_disabled
+gains 1 2 0
+dt 0.1
+ienable 0
+init
+sp 10
+u 0 0.1
+u 2 0.1
+u 5 0.1
+end
+
+scenario integral_runtime_toggle
+gains 1 2 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+u 2 0.1
+setienable 0
+u 4 0.1
+u 6 0.1
+setienable 1
+u 8 0.1
+u 9 0.1
+end
+
+# ---------------------------------------------------------------- 06 modes
+scenario manual_tracking_bumpless
+gains 2 1 0.1
+dt 0.1
+tf 0.05
+outlim -5 5
+mode 0
+init
+sp 4
+manual 1.25
+u 0 0.1
+u 0.5 0.1
+u 1.0 0.1
+setmode 1
+u 1.5 0.1
+u 2.0 0.1
+u 2.5 0.1
+end
+
+scenario hold_mode
+gains 2 1 0.1
+dt 0.1
+tf 0.05
+init
+sp 4
+u 0 0.1
+u 0.5 0.1
+setmode 2
+u 1.0 0.1
+u 1.5 0.1
+setmode 1
+u 2.0 0.1
+u 2.5 0.1
+end
+
+# HOLD must also freeze the back-calculation correction (stage 13 guard).
+scenario hold_with_back_calc
+gains 2 3 0
+dt 0.1
+outlim -1 1
+aw 3 0
+init
+sp 10
+u 0 0.1
+u 0 0.1
+setmode 2
+u 0 0.1
+u 0 0.1
+setmode 1
+u 0 0.1
+end
+
+scenario manual_clamped_transfer
+gains 3 1 0
+dt 0.1
+outlim -1 1
+mode 0
+init
+sp 50
+manual 0.5
+u 0 0.1
+setmode 1
+u 0 0.1
+u 0 0.1
+end
+
+# ------------------------------------------------------------- 07 direction
+scenario reverse_acting
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+direction 1
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u 3 0.1
+u 5 0.1
+u 6 0.1
+end
+
+scenario direction_flip_runtime
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+init
+sp 5
+u 0 0.1
+u 1 0.1
+setdir 1
+u 2 0.1
+u 3 0.1
+end
+
+# --------------------------------------------------------------- 08 shaper
+scenario sp_ramp_rate_only
+gains 1 0 0
+dt 0.1
+shaper 2 0 0 0
+init
+sp 10
+u 0 0.1
+u 0 0.1
+u 0 0.1
+u 0 0.1
+u 0 0.1
+end
+
+scenario sp_ramp_trapezoid
+gains 1 0 0
+dt 0.05
+shaper 3 10 5 0
+init
+sp 2
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+end
+
+scenario sp_ramp_midflight_change
+gains 1 0 0
+dt 0.05
+shaper 3 10 5 0
+init
+sp 5
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+sp -1
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+u 0 0.05
+end
+
+scenario output_slew
+gains 10 0 0
+dt 0.1
+shaper 0 0 0 5
+init
+sp 10
+u 0 0.1
+u 0 0.1
+u 0 0.1
+u 0 0.1
+sp 0
+u 0 0.1
+u 0 0.1
+end
+
+scenario shaper_runtime_setup
+gains 1 0 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+setramp 2 0 0
+sp 10
+u 0 0.1
+u 0 0.1
+setslew 1
+u 0 0.1
+u 0 0.1
+end
+
+# ---------------------------------------------------------- 09 input filter
+scenario input_lpf
+gains 2 0 0.3
+dt 0.05
+tf 0.02
+inlpf 0.2
+init
+sp 1
+u 0 0.05
+u 1 0.05
+u 1 0.05
+u 1 0.05
+u 1 0.05
+u 0 0.05
+end
+
+scenario input_lpf_runtime
+gains 2 0 0
+dt 0.05
+init
+sp 1
+u 0 0.05
+setinlpf 0.2
+u 1 0.05
+u 1 0.05
+setinlpf 0
+u 1 0.05
+end
+
+# --------------------------------------------------------------- 10 safety
+scenario safety_range_fault
+gains 2 1 0
+dt 0.1
+outlim -5 5
+safety 1 -10 10 0 0.75 2 0
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u 99 0.1
+u 99 0.1
+u 1 0.1
+u 2 0.1
+end
+
+scenario safety_rate_fault
+gains 2 1 0
+dt 0.1
+outlim -5 5
+safety 1 -1000 1000 5 0.5 1 0
+init
+sp 5
+u 0 0.1
+u 0.2 0.1
+u 50 0.1
+u 50 0.1
+end
+
+# Defect #3 was a fault-recovery bump: the back-solve must be deferred to
+# stage 10 so P/D/FF of the recovery sample are included.
+scenario safety_auto_recover
+gains 2 1 0
+dt 0.1
+outlim -5 5
+safety 1 -10 10 0 0.2 2 1
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u 99 0.1
+u 99 0.1
+u 99 0.1
+u 1.5 0.1
+u 2.0 0.1
+u 2.5 0.1
+end
+
+scenario safety_manual_clear
+gains 2 1 0
+dt 0.1
+outlim -5 5
+safety 1 -10 10 0 0.2 1 0
+init
+sp 5
+u 0 0.1
+u 99 0.1
+u 1 0.1
+clearfault
+u 1.5 0.1
+u 2 0.1
+end
+
+scenario nan_measurement
+gains 2 1 0.1
+dt 0.1
+tf 0.05
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u nan 0.1
+u 2 0.1
+u inf 0.1
+u 3 0.1
+end
+
+# ------------------------------------------------------------- 11 timing
+scenario dt_violation_clamped
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+dtlim 0.05 0.2
+init
+sp 5
+u 0 0.1
+u 1 0.5
+u 2 0.01
+u 3 0.1
+end
+
+scenario dt_nonpositive
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+init
+sp 5
+u 0 0.1
+u 1 0
+u 2 -0.5
+u 3 0.1
+end
+
+scenario dt_varying
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+init
+sp 5
+u 0 0.1
+u 0.5 0.037
+u 1.0 0.12
+u 1.6 0.081
+u 2.2 0.1
+end
+
+scenario nominal_dt_path
+gains 2 1 0.2
+dt 0.1
+tf 0.05
+init
+sp 5
+un 0
+un 1
+un 2
+setdtnom 0.05
+un 3
+un 3.5
+end
+
+# --------------------------------------------------- 12 runtime gain change
+# Integrator is stored in output units, so plain SetGains must NOT rescale it
+# while SetGainsRescaleIntegral must.
+scenario setgains_bumpless
+gains 1 2 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+u 2 0.1
+u 4 0.1
+setgains 3 6 0
+u 6 0.1
+u 7 0.1
+end
+
+scenario setgains_rescale
+gains 1 2 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+u 2 0.1
+u 4 0.1
+rescale 3 6 0
+u 6 0.1
+u 7 0.1
+end
+
+scenario setgains_rescale_from_zero_ki
+gains 1 0 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+u 2 0.1
+rescale 1 4 0
+u 4 0.1
+u 6 0.1
+end
+
+# ------------------------------------------------------------ 13 limits API
+scenario limits_runtime
+gains 2 2 0
+dt 0.1
+init
+sp 10
+u 0 0.1
+u 1 0.1
+setoutlim -1 1
+u 2 0.1
+u 3 0.1
+clroutlim
+u 4 0.1
+setintlim -0.5 0.5
+u 5 0.1
+u 6 0.1
+end
+
+scenario integral_inherits_output_limits
+gains 1 5 0
+dt 0.1
+outlim -2 2
+aw 1 0
+init
+sp 100
+u 0 0.1
+u 0 0.1
+u 0 0.1
+u 0 0.1
+u 0 0.1
+end
+
+scenario setintegrator_direct
+gains 1 1 0
+dt 0.1
+outlim -10 10
+init
+sp 5
+u 0 0.1
+setint 3.5
+u 0 0.1
+setint 99
+u 0 0.1
+end
+
+# ------------------------------------------------------------ 14 feedforward
+scenario feedforward_static
+gains 1 0.5 0
+dt 0.1
+ff 1 2.0 1.0
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u 2 0.1
+setff 3.0
+u 3 0.1
+end
+
+scenario feedforward_gain
+gains 1 0.5 0
+dt 0.1
+ff 1 2.0 0.25
+init
+sp 5
+u 0 0.1
+u 1 0.1
+end
+
+scenario feedforward_per_sample
+gains 1 0.5 0
+dt 0.1
+ff 1 0 1
+init
+sp 5
+uex 0 0.1 nan 1.5 nan nan
+uex 1 0.1 nan 2.5 nan nan
+uex 2 0.1 nan nan nan nan
+end
+
+# ---------------------------------------------------------- 15 gain schedule
+scenario gainsched_linear
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 3 0 1 0 0 5 2 0.5 0 10 4 1 0
+schedcfg 3 0 0
+u 0 0.1
+u 2 0.1
+u 5 0.1
+u 8 0.1
+u 10 0.1
+end
+
+scenario gainsched_smooth
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 3 0 1 0 0 5 2 0.5 0 10 4 1 0
+schedcfg 3 1 0
+u 0 0.1
+u 2 0.1
+u 5 0.1
+u 8 0.1
+u 10 0.1
+end
+
+scenario gainsched_hold
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 3 0 1 0 0 5 2 0.5 0 10 4 1 0
+schedcfg 3 2 0
+u 0 0.1
+u 2 0.1
+u 5 0.1
+u 8 0.1
+u 10 0.1
+end
+
+scenario gainsched_external
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 2 0 1 0 0 10 5 0 0
+schedcfg 5 0 0
+schedvar 0
+u 0 0.1
+schedvar 5
+u 0 0.1
+schedvar 10
+u 0 0.1
+schedvar 20
+u 0 0.1
+end
+
+scenario gainsched_hysteresis
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 2 0 1 0 0 10 5 0 0
+schedcfg 5 0 1.0
+schedvar 5
+u 0 0.1
+schedvar 5.4
+u 0 0.1
+schedvar 6.5
+u 0 0.1
+end
+
+scenario gainsched_via_input
+gains 1 0 0
+dt 0.1
+init
+sp 10
+schedpoints 2 0 1 0 0 10 5 0 0
+schedcfg 5 0 0
+uex 0 0.1 nan nan nan 0
+uex 0 0.1 nan nan nan 5
+uex 0 0.1 nan nan nan 10
+end
+
+# ------------------------------------------------------------ 16 fast path
+# Defect #2 was UpdateFast/Update divergence on an equivalent configuration:
+# these two scenarios must produce identical output columns.
+scenario fastpath
+gains 2 1 0.3
+dt 0.1
+tf 0.05
+outlim -5 5
+aw 1 0
+init
+spimm 4
+ufast 0
+ufast 0.5
+ufast 1.2
+ufast 2.0
+ufast 3.0
+ufast 3.8
+end
+
+scenario fastpath_equivalent_full
+gains 2 1 0.3
+dt 0.1
+tf 0.05
+outlim -5 5
+aw 1 0
+init
+spimm 4
+u 0 0.1
+u 0.5 0.1
+u 1.2 0.1
+u 2.0 0.1
+u 3.0 0.1
+u 3.8 0.1
+end
+
+scenario fastpath_saturating
+gains 5 4 0
+dt 0.1
+outlim -1 1
+aw 1 0
+init
+spimm 10
+ufast 0
+ufast 0
+ufast 0
+ufast 0
+end
+
+# ---------------------------------------------------------------- 17 reset
+scenario reset_state
+gains 2 1 0.3
+dt 0.1
+tf 0.05
+init
+sp 5
+u 0 0.1
+u 1 0.1
+u 2 0.1
+reset
+u 3 0.1
+u 4 0.1
+end
+
+# ----------------------------------------------------- 18 combined torture
+scenario everything_at_once
+gains 2.5 1.4 0.35
+dt 0.05
+tf 0.03
+dmode 2
+weights 0.7 0.3
+integration 1
+outlim -3 3
+intlim -2 2
+aw 3 1.5
+separation 8
+deadband 0.05
+inlpf 0.08
+ff 1 0.4 0.5
+shaper 20 60 40 25
+safety 1 -50 50 400 0 3 1
+init
+sp 6
+u 0 0.05
+u 0.4 0.05
+u 1.1 0.05
+u 2.0 0.05
+u 3.2 0.05
+u 4.1 0.05
+u 4.9 0.05
+u 5.4 0.05
+u 5.8 0.05
+u 6.05 0.05
+u 6.1 0.05
+u 6.0 0.05
+setmode 2
+u 5.95 0.05
+setmode 1
+u 5.9 0.05
+setgains 3.0 2.0 0.4
+u 5.85 0.05
+sp 2
+u 5.5 0.05
+u 4.5 0.05
+u 3.2 0.05
+u 2.4 0.05
+u 2.0 0.05
+end
+
+scenario everything_reverse
+gains 2.5 1.4 0.35
+dt 0.05
+tf 0.03
+direction 1
+dmode 1
+weights 1.2 0.8
+outlim -3 3
+aw 2 0
+inlpf 0.05
+shaper 15 0 0 20
+init
+sp 6
+u 0 0.05
+u 0.8 0.05
+u 2.0 0.05
+u 3.6 0.05
+u 5.0 0.05
+u 6.2 0.05
+u 6.4 0.05
+u 6.0 0.05
+end
+
+# ------------------------------------------------------- 19 tuning rules
+scenario rules_freq
+gains 1 0 0
+dt 0.1
+init
+rule 0 2 1 4.0 2.5 0 0
+rule 0 1 1 4.0 2.5 0 0
+rule 0 0 1 4.0 2.5 0 0
+rule 1 2 1 4.0 2.5 0 0
+rule 1 1 1 4.0 2.5 0 0
+rule 2 2 1 4.0 2.5 0 0
+rule 3 2 1 4.0 2.5 0 0
+rule 4 2 1 4.0 2.5 0 0
+rule 5 2 1 4.0 2.5 0 0
+rule 5 1 1 4.0 2.5 0 0
+rule 5 0 1 4.0 2.5 0 0
+end
+
+scenario rules_fopdt
+gains 1 0 0
+dt 0.1
+init
+rule 6 2 2 2.0 1.0 0.3 0
+rule 6 1 2 2.0 1.0 0.3 0
+rule 6 0 2 2.0 1.0 0.3 0
+rule 7 2 2 2.0 1.0 0.3 0
+rule 7 1 2 2.0 1.0 0.3 0
+rule 7 0 2 2.0 1.0 0.3 0
+rule 8 2 2 2.0 1.0 0.3 0
+rule 8 1 2 2.0 1.0 0.3 0
+rule 8 0 2 2.0 1.0 0.3 0
+rule 8 2 2 2.0 1.0 0.3 1.5
+rule 8 2 2 2.0 1.0 0.3 0.01
+end
+
+scenario rules_mismatch
+gains 1 0 0
+dt 0.1
+init
+rule 7 2 1 4.0 2.5 0 0
+rule 0 2 2 2.0 1.0 0.3 0
+rule 9 2 1 4.0 2.5 0 0
+rule 0 2 1 0 2.5 0 0
+rule 7 2 2 2.0 0 0.3 0
+end
+
+# ----------------------------------------------------- 20 error reporting
+scenario invalid_init_gain
+gains -1 0 0
+dt 0.1
+init
+end
+
+scenario invalid_init_dt
+gains 1 0 0
+dt 0
+init
+end
+
+scenario invalid_init_limits
+gains 1 0 0
+dt 0.1
+outlim 5 5
+init
+end
+
+scenario invalid_init_weights
+gains 1 0 0
+dt 0.1
+weights 3 0
+init
+end
+
+scenario sticky_error_channel
+gains 1 1 0
+dt 0.1
+outlim -1 1
+init
+sp 5
+u 0 0.1
+u nan 0.1
+u 1 0.1
+u 2 0.1
+end

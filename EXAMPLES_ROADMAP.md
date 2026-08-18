@@ -12,14 +12,14 @@
 ## گام‌ها
 
 ### [گام ۱] Minimal — ۵ خط API
-**فایل:** `examples/01_minimal/main_stm32.c`
+**فایل:** `examples_stm32/01_minimal/example01_minimal.c`
 **نرخ:** ۱۰۰ هرتز
 **مفاهیم:** InitDefault, SetGains, SetSetpoint, Update
 **کاربرد:** ساده‌ترین کنترلر — دما، سرعت فن، فشار ساده
 **وضعیت:** ✨ نوشته شد
 
 ### [گام ۲] Temperature/PWM — Anti-Windup
-**فایل:** `examples/02_temperature_pwm/main_stm32.c`
+**فایل:** `examples_stm32/02_antiwindup/example02_antiwindup.c`
 **نرخ:** ۲ هرتز
 **مفاهیم:** PID_Config, output limits, ۴ استراتژی AW, فیلتر ورودی
 **کاربرد:** هیتر، کوره، سیستم HVAC — محرک یک‌طرفه
@@ -41,14 +41,14 @@
 **کاربرد:** درایو موتور، منبع تغذیه، کنترل جریان
 
 ### [گام ۶] Cascade — 3-Level
-**فایل:** `examples/06_cascade_pos_vel_cur/main_stm32.c`
+**فایل:** `examples_stm32/06_cascade/example06_cascade.c`
 **نرخ:** ۲۰ کیلوهرتز (درونی)
 **مفاهیم:** PID_Cascade, decimation, inter-level clamp, AW back-propagation
 **کاربرد:** سروو حرفه‌ای، CNC، ربات صنعتی
 **وضعیت:** ✨ نوشته شد
 
 ### [گام ۷] Auto-Tune — Relay & Step
-**فایل:** `examples/07_autotune_relay/main_stm32.c`
+**فایل:** `examples_stm32/07_autotune/example07_autotune.c`
 **نرخ:** ۱۰ هرتز
 **مفاهیم:** PID_AutoTune, relay vs step, ۹ tuning rule, safety envelope
 **کاربرد:** هر جا نمی‌دونید gain چقدر باید باشه
