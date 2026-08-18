@@ -224,6 +224,16 @@ engine, Q15/Q31 fixed point and the lock-free telemetry ring are deliberately
 
 ---
 
+## Step-by-step examples (STM32, Persian)
+
+A separate set of 10 runnable examples built for learning PIDX from scratch on an
+STM32 (or on a PC with `-DTEST_ON_PC`). Each file is standalone: plant model +
+`init()` + `tick()`. Start with `examples_stm32/01_minimal`.
+
+See `examples_stm32/README.md` for the full list and how to run each one.
+
+---
+
 ## Documentation
 
 Full documentation is in **Persian** under `docs/` (API names stay English).
