@@ -236,9 +236,17 @@ reach the board without being retyped.
 ```matlab
 cd ports/matlab && simlab_setup
 simlab_demos.demo_quick      % plant -> identify -> verify -> export C
+simlab_demos.demo_design     % design to a specification, then price it
 simlab_wizard                % the same workflow, driven from the console
 simlabApp                    % ... or from a GUI
 ```
+
+Also: `simlab.identify` fits a FOPDT to a recorded step; `simlab.designByGoal`
+searches the IMC lambda family for gains that meet an overshoot / settling /
+Ms specification and says which constraint binds when none do; `simlab.PIDq`
+and `simlab.compareFixed` price the Q15 version; `simlab.hilRun` runs a
+scenario with the controller on the board and `simlab.hilCompare` triages the
+difference.
 
 The generated C is not a paraphrase: `simlab_tests/test_export.m` compiles it
 against `include/pidx/`, links it with `src/*.c`, feeds both sides the same

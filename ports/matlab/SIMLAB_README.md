@@ -66,8 +66,18 @@ library, that test fails here rather than on the board.
 | `+simlab/monteCarlo` | K, tau, L each perturbed 0.5×..2×; survival share |
 | `+simlab/compareRules` | all nine rules on your plant, both rankings |
 | `+simlab/plot`, `plotSensitivity`, `plotRules` | the figures |
-| `+simlab/exportSTM32` | the C |
+| `+simlab/exportSTM32` | the C, plus HIL inspection hooks |
 | `+simlab/exportReport` | CSV trace + JSON record |
+| `+simlab/identify` | fit a FOPDT to a recorded step (area/moment, as in C) |
+| `+simlab/readStepData` | historian CSV → `.t/.y/.u`, with the traps handled |
+| `+simlab/designByGoal` | "overshoot < 5 %, as fast as possible" → gains |
+| `+simlab/PIDq` | port of `src/pid_fixed.c`: Q15 I/O, Q30 internals |
+| `+simlab/Scaling` | engineering units ↔ Q15, and the gain ratio that follows |
+| `+simlab/Q15Loop` | the Q15 controller dressed as a `pidx.PID`, for one runner |
+| `+simlab/compareFixed` | what the fixed-point version costs, on your plant |
+| `+simlab/hilConnect` | open the link to a board running the HIL firmware |
+| `+simlab/hilRun` | run a scenario with the controller on the board |
+| `+simlab/hilCompare` | triage where the board disagrees, and why |
 
 ### The plant is three stages, not a transfer function
 
@@ -201,6 +211,103 @@ loop crossing near 1.7 rad/s it is 25 degrees of phase you did not account for.
 
 ---
 
+## Designing to a specification
+
+```matlab
+m    = simlab.identify('heater_step.csv');          % from data you already have
+goal = struct('maxOvershoot', 5, 'maxMs', 1.6, 'minDelayMargin', 5, ...
+              'objective', 'iae');
+d    = simlab.designByGoal(plant, goal, struct('model', m, 'dt', 0.25));
+```
+
+The candidate family is IMC lambda tuning, because lambda **is** the
+speed/robustness dial — every other rule is a particular choice of it. The
+sweep is screened on the frequency-domain constraints first (pure arithmetic,
+no simulation) and only the survivors are simulated, which is what makes a
+100-point sweep affordable.
+
+If nothing meets every constraint, it says so and names the binding one:
+
+> INFEASIBLE: the requested settling time 1.0 s is below about 3\*L = 36 s.
+> The dead time is 12 s: the loop cannot correct for an error it has not seen
+> yet.
+
+`d.candidates` carries every candidate with the constraints it broke, so the
+trade-off is visible rather than taken on trust.
+
+`simlab.identify` uses the same area/moment fit as `pidt_analyze_step()` in C,
+including the midpoint moment arm — sampled at the right endpoint instead, the
+first moment comes up short by `te·dt/2` per unit of `dy`, a deficit that
+**grows** with the record, so a longer and more careful test would produce a
+worse model. It refuses a response that is not first order rather than
+returning a plausible model that will detune the loop.
+
+---
+
+## Fixed point
+
+```matlab
+sy = simlab.Scaling(0, 300);   % degC -> Q15
+su = simlab.Scaling(0, 100);   % %    -> Q15
+r  = simlab.compareFixed(plant, struct('kp',3,'ki',0.08,'kd',0), ...
+        struct('dt', 0.001, 'measRange',[0 300], 'outRange',[0 100]));
+```
+
+`simlab.PIDq` is a port of `src/pid_fixed.c` — Q15 signals, Q16.16 gains,
+**Q30 internals**, with the same saturating arithmetic and arithmetic right
+shift. The internal width is not an optimisation:
+
+> The per-sample integral increment is `Ki·dt·e`. With Ki = 0.5, dt = 1 ms and
+> an error of one LSB that is 1.5e-8 in real units — 0.0005 of a Q15 LSB.
+> Rounded into a Q15 accumulator it is exactly zero, so the integrator never
+> moves and the loop holds a permanent steady-state error no tuning removes.
+
+`compareFixed` runs both controllers through the **same** `simlab.Sim`, on the
+same plant and the same noise realisation, and reports the difference in output
+LSBs — then checks the three things that actually go wrong: integral
+resolution, steady-state error the float loop does not have, and output chatter
+from the derivative amplifying converter steps.
+
+MATLAB's `int32` class **saturates** where C wraps, silently. The port holds
+state in doubles and wraps explicitly, so it overflows exactly where the C
+does instead of hiding it.
+
+---
+
+## Hardware in the loop
+
+```matlab
+h = simlab.hilConnect('port', 'COM5');
+r = simlab.hilRun(h, plant, scenario);
+c = simlab.hilCompare(rSim, r);
+```
+
+The board runs `tools/hil/hil_board.c`, which calls the **same**
+`<symbol>_init()` and `<symbol>_tick()` that `exportSTM32` wrote — the identical
+translation unit, not a reimplementation that happens to look similar. Build and
+prove it on the host first:
+
+```bash
+make simlab-hil TUNING=/path/to/pidx_tuning_myLoop.h SYMBOL=myLoop
+```
+
+`hilCompare` does the triage, because two traces that differ by 2 % somewhere
+are not actionable:
+
+| | |
+|---|---|
+| y differs, u agrees | the **plant model** is wrong. Retuning would be the wrong response |
+| u differs, y agrees | the **controller** is not the one you designed. Check what is flashed, the dt, and fast-math |
+| both differ from t = 0 | a **units** mismatch — the most common cause and the easiest to miss |
+| both agree then diverge | something **saturated or faulted**. Compare the flags, not the values |
+
+The rate is bounded by the serial round trip, not by the core: fine for a
+process loop at 10–500 Hz, wrong for a 20 kHz current loop, and buffering will
+not fix that — a controller whose dt depends on the host is not the controller
+under test.
+
+---
+
 ## Verifying it
 
 ```matlab
@@ -261,7 +368,12 @@ ports/matlab/simlab_setup.m     addpath
 ports/matlab/simlab_wizard.m    console workflow
 ports/matlab/simlabApp.m        graphical interface
 tools/matlab_ref/               C oracle that generates c_reference.csv
+tools/hil/                      HIL firmware + host build + protocol smoke test
 tools/matlab_lint.py            structural linter, no interpreter needed
 tools/check_export_identifiers.py  every emitted PID_* name exists in the headers
 docs/25_matlab_simlab.md        Persian documentation
 ```
+
+`make simlab` runs both no-interpreter checks. `make simlab-ref` rebuilds the C
+oracle. `make simlab-hil TUNING=... SYMBOL=...` builds the HIL firmware against
+a real exported file and drives it through a full protocol session.

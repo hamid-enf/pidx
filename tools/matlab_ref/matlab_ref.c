@@ -28,6 +28,7 @@
 #include "pidx/pid.h"
 #include "pidx/pid_autotune.h"
 #include "pidx/pid_cascade.h"
+#include "pidx/pid_fixed.h"
 
 /* ======================================================================== */
 /* Plant models - the same equations as simlab.Plant                         */
@@ -489,6 +490,188 @@ static void scenario_cascade(const char *tag)
     }
 }
 
+
+/* ======================================================================== */
+/* 7. Fixed-point Q15 controller                                             */
+/* ======================================================================== */
+/*
+ * The measurement sequence is a fixed formula rather than a file, so both
+ * sides generate it identically without an I/O step. It is quantised to Q15
+ * before use, because that quantisation is part of what is being compared.
+ */
+
+static int16_t q_meas(int k)
+{
+    double t = (double)k * 0.001;
+    double y = 0.4 * (1.0 - exp(-t / 0.05)) + 0.15 * sin((double)k * 0.07);
+    double q = y * 32768.0;
+    q = (q < 0.0) ? (q - 0.5) : (q + 0.5);
+    q = (double)(int32_t)q;
+    if (q > 32767.0)  { q = 32767.0; }
+    if (q < -32768.0) { q = -32768.0; }
+    return (int16_t)q;
+}
+
+static void scenario_q15(const char *tag)
+{
+    PIDq_Handle h;
+    PIDq_Config cfg;
+    char key[128];
+    int k;
+    int16_t u;
+
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.kp_q16 = PIDQ_F_TO_Q16(1.5);
+    cfg.ki_q16 = PIDQ_F_TO_Q16(4.0);
+    cfg.kd_q16 = PIDQ_F_TO_Q16(0.01);
+    cfg.dt_us = 1000U;
+    cfg.tf_us = 2000U;
+    cfg.out_min_q15 = PIDQ_F_TO_Q15(-0.9);
+    cfg.out_max_q15 = PIDQ_F_TO_Q15(0.9);
+    cfg.i_min_q15 = PIDQ_F_TO_Q15(-0.9);
+    cfg.i_max_q15 = PIDQ_F_TO_Q15(0.9);
+    cfg.aw_mode = (uint8_t)PIDQ_AW_BACK_CALC;
+    cfg.bc_shift = 4U;
+
+    if (PIDq_Init(&h, &cfg) != PID_OK) {
+        printf("# q15 init failed\n");
+        return;
+    }
+    (void)PIDq_SetSetpoint(&h, PIDQ_F_TO_Q15(0.5));
+
+    for (k = 0; k < 200; ++k) {
+        if (k == 100) {
+            (void)PIDq_SetSetpoint(&h, PIDQ_F_TO_Q15(-0.3));
+        }
+        u = PIDq_Update(&h, q_meas(k));
+        if ((k % 10) == 0) {
+            snprintf(key, sizeof(key), "%s.u%03d", tag, k);
+            emit_i(key, (long)u);
+        }
+    }
+    snprintf(key, sizeof(key), "%s.finalU", tag);
+    emit_i(key, (long)u);
+    snprintf(key, sizeof(key), "%s.integral", tag);
+    emit_i(key, (long)PIDq_GetIntegral(&h));
+    snprintf(key, sizeof(key), "%s.saturated", tag);
+    emit_i(key, PIDq_IsSaturated(&h) ? 1L : 0L);
+}
+
+/*
+ * Integral resolution death, demonstrated rather than asserted.
+ *
+ * One LSB of error, Ki = 0.5, dt = 1 ms: the increment is 1.5e-8 in real
+ * units, which is 0.0005 of a Q15 LSB. A Q15 accumulator would round it to
+ * zero and never move. The Q30 accumulator accumulates it correctly, and
+ * after enough samples the output LSB finally moves. The number of samples
+ * it takes is the quantity worth knowing before you choose a gain format.
+ */
+static void scenario_q15_resolution(const char *tag)
+{
+    PIDq_Handle h;
+    PIDq_Config cfg;
+    char key[128];
+    int k;
+    int first_move = -1;
+    int16_t u = 0;
+    int16_t prev = 0;
+
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.kp_q16 = 0;                     /* pure integrator: only I can move */
+    cfg.ki_q16 = PIDQ_F_TO_Q16(0.5);
+    cfg.kd_q16 = 0;
+    cfg.dt_us = 1000U;
+    cfg.out_min_q15 = PIDQ_F_TO_Q15(-0.9);
+    cfg.out_max_q15 = PIDQ_F_TO_Q15(0.9);
+
+    if (PIDq_Init(&h, &cfg) != PID_OK) {
+        printf("# q15 resolution init failed\n");
+        return;
+    }
+    (void)PIDq_SetSetpoint(&h, (int16_t)1);      /* one LSB of error */
+
+    for (k = 0; k < 200000; ++k) {
+        u = PIDq_Update(&h, (int16_t)0);
+        if ((first_move < 0) && (u != prev)) {
+            first_move = k;
+        }
+        prev = u;
+    }
+    snprintf(key, sizeof(key), "%s.firstMoveSample", tag);
+    emit_i(key, (long)first_move);
+    snprintf(key, sizeof(key), "%s.finalU", tag);
+    emit_i(key, (long)u);
+    snprintf(key, sizeof(key), "%s.integral", tag);
+    emit_i(key, (long)PIDq_GetIntegral(&h));
+}
+
+/*
+ * A tune that the format cannot represent. Ki*dt >= 2.0 means the loop would
+ * integrate more than full scale in a single sample, which is always a
+ * configuration error, and PIDq_Init must refuse it rather than saturate
+ * every sample and look like it is working.
+ */
+static void scenario_q15_reject(const char *tag)
+{
+    PIDq_Handle h;
+    PIDq_Config cfg;
+    char key[128];
+
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.ki_q16 = (int32_t)2000000;      /* Ki ~ 30.5, dt = 1 ms */
+    cfg.dt_us = 100000U;                /* 100 ms: Ki*dt ~ 3.05 > 2.0 */
+
+    snprintf(key, sizeof(key), "%s.initRc", tag);
+    emit_i(key, (long)PIDq_Init(&h, &cfg));
+
+    /* Separation at or below the deadband leaves no window in which the
+     * integrator can run at all; that is refused too. */
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.deadband_q15 = 100U;
+    cfg.separation_q15 = 50U;
+    snprintf(key, sizeof(key), "%s.separationRc", tag);
+    emit_i(key, (long)PIDq_Init(&h, &cfg));
+
+    /* Back-calculation with a zero shift would feed the whole saturation
+     * error back in one sample and ring. */
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.aw_mode = (uint8_t)PIDQ_AW_BACK_CALC;
+    cfg.bc_shift = 0U;
+    snprintf(key, sizeof(key), "%s.bcShiftRc", tag);
+    emit_i(key, (long)PIDq_Init(&h, &cfg));
+}
+
+/* Bumpless manual -> automatic transfer. */
+static void scenario_q15_bumpless(const char *tag)
+{
+    PIDq_Handle h;
+    PIDq_Config cfg;
+    char key[128];
+    int16_t u_manual;
+    int16_t u_auto;
+
+    (void)PIDq_ConfigDefault(&cfg);
+    cfg.kp_q16 = PIDQ_F_TO_Q16(2.0);
+    cfg.ki_q16 = PIDQ_F_TO_Q16(1.0);
+    cfg.dt_us = 1000U;
+    cfg.mode = (uint8_t)PIDQ_MODE_MANUAL;
+
+    (void)PIDq_Init(&h, &cfg);
+    (void)PIDq_SetSetpoint(&h, PIDQ_F_TO_Q15(0.5));
+    (void)PIDq_SetManualOutput(&h, PIDQ_F_TO_Q15(0.25));
+
+    u_manual = PIDq_Update(&h, PIDQ_F_TO_Q15(0.1));
+    (void)PIDq_SetMode(&h, PIDQ_MODE_AUTOMATIC);
+    u_auto = PIDq_Update(&h, PIDQ_F_TO_Q15(0.1));
+
+    snprintf(key, sizeof(key), "%s.uManual", tag);
+    emit_i(key, (long)u_manual);
+    snprintf(key, sizeof(key), "%s.uAfterSwitch", tag);
+    emit_i(key, (long)u_auto);
+    snprintf(key, sizeof(key), "%s.bumpless", tag);
+    emit_i(key, (u_manual == u_auto) ? 1L : 0L);
+}
+
 /* ======================================================================== */
 /* main                                                                      */
 /* ======================================================================== */
@@ -505,6 +688,10 @@ int main(void)
     scenario_relay_reject("relayreject");
     scenario_mismatch();
     scenario_cascade("cascade");
+    scenario_q15("q15");
+    scenario_q15_resolution("q15res");
+    scenario_q15_reject("q15reject");
+    scenario_q15_bumpless("q15bump");
 
     return 0;
 }

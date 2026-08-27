@@ -19,7 +19,7 @@
 # somebody's board.
 
 .PHONY: all test examples sim bench ports gate clean distclean help \
-        simlab simlab-ref
+        simlab simlab-ref simlab-hil
 
 help:
 	@echo "PIDX - targets: test examples sim bench ports gate simlab all clean"
@@ -60,6 +60,12 @@ simlab:
 # Rebuild the C oracle and the reference numbers the MATLAB tests assert on.
 simlab-ref:
 	@$(MAKE) -C tools/matlab_ref run
+
+# Build and drive the HIL firmware through a full protocol session on the
+# host. Needs a generated tuning file:
+#   make simlab-hil TUNING=/path/to/pidx_tuning_myLoop.h SYMBOL=myLoop
+simlab-hil:
+	@$(MAKE) -C tools/hil smoke $(if $(TUNING),TUNING=$(TUNING),) $(if $(SYMBOL),SYMBOL=$(SYMBOL),)
 
 # The warning gate. Compiles every source file on its own, under every
 # compile-time profile, at both -Os and -O2, with warnings as errors.

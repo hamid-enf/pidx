@@ -233,17 +233,45 @@ def collect_package_functions(root):
     return funcs
 
 
+def package_root(path):
+    """The nearest ancestor of PATH that contains +pidx.
+
+    Package directories are children of a directory on the MATLAB path, so a
+    call to pidx.X resolves from anywhere inside the tree - not just from the
+    root the user happened to lint. Walking up is what makes
+    `matlab_lint.py ports/matlab/+simlab` report real problems rather than
+    flagging every cross-package call as missing.
+    """
+    d = os.path.dirname(os.path.abspath(path))
+    for _ in range(8):
+        if os.path.isdir(os.path.join(d, "+pidx")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
 def check_cross_references(paths, known):
     """Flag calls to pidx.X / simlab.X that have no file behind them."""
     problems = []
     pat = re.compile(r"\b(pidx|simlab|simlab_tests)\.([A-Za-z_]\w*)")
     for path in paths:
+        root = package_root(path)
+        local = known
+        if root is not None:
+            local = collect_package_functions(root)
+        elif known is None:
+            # No package tree in scope at all: nothing to resolve against, so
+            # say nothing rather than flag every call.
+            continue
         with open(path, encoding="utf-8", errors="replace") as fh:
             for n, raw in enumerate(fh.read().split("\n"), 1):
                 code, _ = strip_comment(raw)
                 for pkg, name in pat.findall(code):
                     key = "%s.%s" % (pkg, name)
-                    if key in known:
+                    if key in local:
                         continue
                     # property/method access on an object, or a Constant block
                     if name[0].isupper() and key.split(".")[1] in (
@@ -252,7 +280,8 @@ def check_cross_references(paths, known):
                         continue
                     problems.append(
                         "%s:%d: call to %s but no %s/+%s/%s.m exists"
-                        % (path, n, key, os.path.dirname(os.path.dirname(path)),
+                        % (path, n, key,
+                           root if root else os.path.dirname(os.path.dirname(path)),
                            pkg, name))
     return problems
 
