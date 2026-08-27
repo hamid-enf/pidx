@@ -3,6 +3,13 @@
 A `classdef` port of the PIDX control framework, verified number by number
 against the C library (502/502 conformance rows identical).
 
+On top of it sits **`+simlab`, a simulation and tuning workbench**: plant
+models with real sensor and actuator chains, a scenario engine, the auto-tune
+state machine, Monte Carlo robustness, frequency-domain margins, and an
+exporter that writes compilable C for STM32CubeIDE. Start with
+[`SIMLAB_README.md`](SIMLAB_README.md), or run `simlab_setup` and then
+`simlab_demos.demo_quick`.
+
 > Validated under **GNU Octave 9.4.0**. MathWorks MATLAB was not available
 > where this was developed, so while the code uses no toolbox functions and
 > no Octave-only syntax, "tested" means Octave.
