@@ -198,8 +198,6 @@ function m = identify(data, opt)
             'within the record. The fit uses the whole trace, so a tail that ' ...
             'is still moving biases T low and L high. Record longer.'];
     end
-    %#ok<NASGU>
-    totalPrev;
 
     dy = ySettled - y0;
     if abs(dy) < 5 * sigma

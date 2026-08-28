@@ -65,8 +65,15 @@ classdef Scaling < handle
         end
 
         function q = toQ15(o, v)
-            span = o.hi - o.lo;
-            q = (v - o.lo) / span * o.fullScale;
+            % Unipolar ranges map onto [0, 32767]: a 0..100% duty cycle has no
+            % negative side, and wasting half the code space on it would halve
+            % the resolution. Bipolar ranges map symmetrically onto the full
+            % signed domain, so -full scale is exactly -32768.
+            if o.lo >= 0
+                q = (v - o.lo) / (o.hi - o.lo) * o.fullScale;
+            else
+                q = v / max(-o.lo, o.hi) * 32768;
+            end
             q = simlab.Scaling.roundAway(q);
             if q > 32767,  q = 32767;  end
             if q < -32768, q = -32768; end
@@ -74,8 +81,11 @@ classdef Scaling < handle
         end
 
         function v = toEng(o, q)
-            span = o.hi - o.lo;
-            v = double(q) / o.fullScale * span + o.lo;
+            if o.lo >= 0
+                v = double(q) / o.fullScale * (o.hi - o.lo) + o.lo;
+            else
+                v = double(q) / 32768 * max(-o.lo, o.hi);
+            end
         end
 
         function s = span(o)
@@ -89,7 +99,21 @@ classdef Scaling < handle
             r = (o.hi - o.lo) / o.fullScale;
         end
 
-        function g = fromFloatGains(~, kp, ki, kd, sy, su)
+
+        function ok = fitsQ15(o, v)
+            % True when every value in V is inside the declared range.
+            %
+            % Asking this BEFORE building a fixed-point loop is cheaper than
+            % discovering it as a wrapped actuator command: a measurement
+            % above full scale clamps, which is survivable, but a range that
+            % was declared too narrow silently compresses the whole signal
+            % into part of the code space.
+            ok = all(v >= o.lo & v <= o.hi);
+        end
+    end
+
+    methods (Static)
+        function g = fromFloatGains(kp, ki, kd, sy, su)
             % GAINS = FROMFLOATGAINS(KP, KI, KD, SY, SU)
             %
             % Converts a floating-point tuning to Q16.16, accounting for the
@@ -113,19 +137,6 @@ classdef Scaling < handle
             g.kd_q16 = simlab.PIDq.fToQ16(kd * ratio);
         end
 
-        function ok = fitsQ15(o, v)
-            % True when every value in V is inside the declared range.
-            %
-            % Asking this BEFORE building a fixed-point loop is cheaper than
-            % discovering it as a wrapped actuator command: a measurement
-            % above full scale clamps, which is survivable, but a range that
-            % was declared too narrow silently compresses the whole signal
-            % into part of the code space.
-            ok = all(v >= o.lo & v <= o.hi);
-        end
-    end
-
-    methods (Static)
         function r = roundAway(x)
             if x < 0
                 r = -floor(-x + 0.5);

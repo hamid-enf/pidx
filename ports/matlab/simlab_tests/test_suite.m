@@ -103,7 +103,15 @@ function results = test_suite(varargin)
         catch err
             T.failed = T.failed + 1;
             fprintf('ERROR\n');
-            T.details{end + 1} = sprintf('%s: %s', name, err.message); %#ok<AGROW>
+            where = '';
+            for jf = 1:numel(err.stack)
+                % The first frame inside simlab code, not the harness.
+                if ~isempty(strfind(err.stack(jf).file, 'simlab')) %#ok<STREMP>
+                    where = sprintf(' [%s:%d]', err.stack(jf).name, err.stack(jf).line);
+                    break;
+                end
+            end
+            T.details{end + 1} = sprintf('%s: %s%s', name, err.message, where); %#ok<AGROW>
             if verbose
                 % getReport is MATLAB-only; under Octave the message and the
                 % stack are all there is, and all a reader needs.

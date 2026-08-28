@@ -59,7 +59,10 @@ function T = test_metrics(T)
     kLate = round(6 / dt);
     r2.y(kLate:kLate + 200) = 1.5;       % a late excursion
     m2 = simlab.metrics(r2);
-    T = simlab_tests.ok(T, m2.settlingTime > 5.9, ...
+    % The excursion holds y at 1.5 during t = 6.0..6.2 s, so the last exit
+    % from the band is ~6.2 s; measured from the step at t = 1 s that is
+    % ~5.2 s. The point is that it is NOT the first entry (~2-3 s).
+    T = simlab_tests.ok(T, m2.settlingTime > 5.0 && m2.settlingTime < 5.5, ...
         'a late excursion moves the settling time to %.3f s, not to the first entry', ...
         m2.settlingTime);
 

@@ -53,8 +53,14 @@ function T = test_plant(T)
         worstCont);
 
     % ---- 2. steady state ----
-    T = simlab_tests.near(T, y600 / 1.0, K_ * (1 - exp(-60 / tau)), 1e-9, ...
-        'steady state approaches K');
+    % Compare against the DISCRETE closed form, not the continuous one: the
+    % backward-Euler pole differs from exp(-dt/tau) by O(dt^2), which is real
+    % and must not be asserted away, but must not be asserted against either.
+    aDisc = tau / (tau + dt);
+    T = simlab_tests.near(T, y600, K_ * (1 - aDisc^600), 1e-9, ...
+        'steady state matches the discrete closed form exactly');
+    T = simlab_tests.ok(T, abs(y600 - K_ * (1 - exp(-60 / tau))) / K_ < 0.01, ...
+        'and stays within 1%% of the continuous solution');
 
     % ---- 3. dead time actually delays ----
     pld = simlab.Plant('fopdt', 'k', K_, 'tau', tau, 'l', L);
@@ -145,8 +151,8 @@ function T = test_plant(T)
     for k = 1:200000
         w = pm.update(10, 1e-4);
     end
-    expected = pm.motorParam('kt') / (pm.motorParam('b') + ...
-        pm.motorParam('kt') * pm.motorParam('ke') / pm.motorParam('r'));
+    expected = pm.modelParam('kt') / (pm.modelParam('b') + ...
+        pm.modelParam('kt') * pm.modelParam('ke') / pm.modelParam('r'));
     T = simlab_tests.ok(T, abs(w / 10 - expected) / expected < 0.01, ...
         'DC motor static gain %.5f matches Kt/(B+Kt*Ke/R) = %.5f', ...
         w / 10, expected);

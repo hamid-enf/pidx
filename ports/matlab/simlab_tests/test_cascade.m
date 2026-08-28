@@ -111,6 +111,11 @@ function T = test_cascade(T)
     innerS = pidx.PID(cfgI);
     clS = simlab.Cascade({outerS, innerS});
     clS.configLevel(0, 10, -20, 20);
+    % The inner loop saturates on this data, and the cascade's saturation
+    % back-propagation would then (correctly!) touch the outer integrator,
+    % contaminating a check that is about the DECIMATION. Turn it off here;
+    % the back-propagation has its own check above.
+    clS.setAntiWindup(clS.AW_NONE, 0);
     uS = 0;
     for k = 1:10
         uS = clS.update([yOuter; 0], 30, dt);

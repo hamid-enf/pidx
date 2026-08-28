@@ -283,6 +283,15 @@ classdef Plant < handle
                 error('simlab:Plant:badDt', 'dt must be finite and > 0');
             end
             if ~o.s_rng_seeded, o.reset(); end
+            % The delay lines are sized by dt, which is not known at
+            % construction. A plant built with L = 12 s and stepped for the
+            % first time at dt = 0.05 must build its 240-sample buffer HERE;
+            % without this the very first study ran an UNDELAYED plant, which
+            % is a different process - and the auto-tune tests proved it.
+            if o.dt ~= dt
+                o.dt = dt;
+                o.rebuildDelays();
+            end
             o.dt = dt;
             o.uCmd = u_cmd;
 
