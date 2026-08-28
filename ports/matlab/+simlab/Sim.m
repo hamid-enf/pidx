@@ -119,8 +119,18 @@ classdef Sim < handle
             end
 
             % ---- phase 2: the scenario ----
+            % An Inf horizon (integrating plant) makes n Inf, and `Inf < 2`
+            % is false, so the old guard let zeros(1, Inf) through to its own
+            % error. Finite-ness is part of the check.
+            if ~isfinite(o.scenario.tEnd) || o.scenario.tEnd <= 0
+                error('simlab:Sim:badHorizon', ...
+                    ['the scenario horizon is %.6g s, which is not a usable ' ...
+                     'duration. For an integrating plant, build the scenario ' ...
+                     'with a finite tEnd (see defaultHorizon in the app).'], ...
+                    o.scenario.tEnd);
+            end
             n = round(o.scenario.tEnd / dt);
-            if n < 2
+            if ~isfinite(n) || n < 2
                 % A one-sample "run" is not a run, and everything downstream
                 % (metrics, plots) degenerates on it. Name the two numbers
                 % that produced it, because that is the whole diagnosis.

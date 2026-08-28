@@ -252,7 +252,7 @@ function cbOpenLoop(src)
     if ~isfinite(hi), hi = 1; end
     if ~isfinite(lo), lo = 0; end
     c.setManualOutput(lo + 0.5 * (hi - lo));
-    sc = simlab.Scenario('open-loop step', 6 * max(S.plant.tau(), 1));
+    sc = simlab.Scenario('open-loop step', defaultHorizon(S.plant));
     sc.setpoint(0, 0);
     r = simlab.Sim(S.plant, c, sc).run();
     simlab.plot(r, struct('fig', 90, 'title', ...

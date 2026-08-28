@@ -277,6 +277,14 @@ end
 function model = relayIdentify(plant, dt, o)
 % Identify (Ku, Pu) with a relay, because that is what the target would do.
 %
+% dt arrives from the caller; on an integrating plant an earlier version of
+% the tool passed Inf here and PID init died with ERR_INVALID_DT. Guard it.
+    if ~isfinite(dt) || dt <= 0
+        tau = plant.tau();
+        if ~isfinite(tau) || tau <= 0, tau = 10; end
+        dt = max(tau / 40, 1e-4);
+    end
+%
 % Inventing a (K, tau, L) -> (Ku, Pu) conversion here would make the FREQ
 % rules look better than they are: the conversion would be exact, and on the
 % real plant it never is.
