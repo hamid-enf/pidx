@@ -281,6 +281,7 @@ function S = buildRunTab(S)
     btn(pa, 'Monte Carlo', 0.175, 0.25, 0.16, 0.5, @(s, e) cbMC(s));
     btn(pa, 'Compare 9 rules', 0.355, 0.25, 0.16, 0.5, @(s, e) cbRules(s));
     btn(pa, 'Re-plot', 0.535, 0.25, 0.12, 0.5, @(s, e) cbReplot(s));
+    btn(pa, 'Explain the loop', 0.675, 0.25, 0.17, 0.5, @(s, e) cbExplain(s));
 
     S.runInfo = infoBox(p, 0.015, 0.03, 0.97, 0.75);
 end
@@ -781,6 +782,17 @@ function cbRun(src)
     say(S, 'done - overshoot %.1f%%, settling %.4g s', ...
         S.result.metrics.overshoot, S.result.metrics.settlingTime);
     put_(src, S);
+end
+
+function cbExplain(src)
+    S = get_(src);
+    if isempty(S.result) || isempty(S.plant) || isempty(S.cfg)
+        say(S, 'run something first - then the loop can explain itself');
+        return;
+    end
+    story = simlab.explain(S.result, S.plant, S.cfg, struct('fig', 96));
+    set(S.runInfo, 'String', strjoin(wrap(story), sprintf('\n')));
+    say(S, 'the loop, explained: every gap between two traces is one stage');
 end
 
 function cbReplot(src)
