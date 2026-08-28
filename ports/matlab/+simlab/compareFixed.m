@@ -288,3 +288,17 @@ function o = fillOpt(o, name, default)
         o.(name) = default;
     end
 end
+
+function sp = defaultSetpoint(plant)
+% Half the actuator span mapped through the plant gain: large enough to be
+% meaningful, small enough not to spend the run saturated. Local to this
+% file because a study must not depend on the app's private helpers - the
+% first real run died on exactly that invisible coupling.
+    [lo, hi] = plant.actuatorLimits();
+    if ~isfinite(lo), lo = 0; end
+    if ~isfinite(hi), hi = 1; end
+    k = plant.steadyStateGain();
+    if ~isfinite(k) || k <= 0, k = 1; end
+    sp = 0.5 * (hi - lo) * k;
+    if ~isfinite(sp) || sp == 0, sp = 1; end
+end
