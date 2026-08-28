@@ -54,11 +54,16 @@ function simlabApp()
     S.tabRun = uitab(tg, 'Title', '4 Run');
     S.tabExport = uitab(tg, 'Title', '5 Export');
 
-    buildPlantTab(S);
-    buildCtrlTab(S);
-    buildScenTab(S);
-    buildRunTab(S);
-    buildExportTab(S);
+    % Structs are pass-by-value: each build adds its control handles to ITS
+    % copy and returns it. Chaining the returns is what makes the final
+    % setappdata carry every field - the original version saved main's
+    % field-less copy over the builds' copies, and the first callback died on
+    % a missing field. Found by the first real MATLAB session.
+    S = buildPlantTab(S);
+    S = buildCtrlTab(S);
+    S = buildScenTab(S);
+    S = buildRunTab(S);
+    S = buildExportTab(S);
 
     setappdata(S.f, 'simlabState', S);
     refreshAll(S.f);
@@ -87,7 +92,7 @@ end
 % Tab 1: plant
 % ===========================================================================
 
-function buildPlantTab(S)
+function S = buildPlantTab(S)
     p = S.tabPlant;
 
     uicontrol(p, 'Style', 'text', 'String', 'preset', ...
@@ -131,7 +136,6 @@ function buildPlantTab(S)
         'HorizontalAlignment', 'left', 'ForegroundColor', [0.1 0.2 0.6], ...
         'Position', [20 20 920 24]);
 
-    put_(S.plantPreset, S);
 end
 
 function cbPreset(src)
@@ -260,7 +264,7 @@ end
 % Tab 2: controller
 % ===========================================================================
 
-function buildCtrlTab(S)
+function S = buildCtrlTab(S)
     p = S.tabCtrl;
     labels = {'dt (sample time, s)', 'Kp', 'Ki', 'Kd', 'Tf (0 = Td/10)', ...
               'out min', 'out max', 'beta', 'gamma', 'input LPF tau'};
@@ -308,7 +312,6 @@ function buildCtrlTab(S)
     S.ctrlInfo = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
         'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
         'BackgroundColor', 'w', 'Position', [360 60 580 400], 'String', '');
-    put_(S.dt, S);
 end
 
 function cbApplyCtrl(src)
@@ -546,7 +549,7 @@ end
 % Tab 3: scenario
 % ===========================================================================
 
-function buildScenTab(S)
+function S = buildScenTab(S)
     p = S.tabScen;
     uicontrol(p, 'Style', 'text', 'String', 'preset', ...
         'HorizontalAlignment', 'left', 'Position', [20 590 60 20]);
@@ -576,7 +579,6 @@ function buildScenTab(S)
         'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
         'BackgroundColor', 'w', 'Position', [300 60 640 460], ...
         'String', 'no scenario yet');
-    put_(S.scPreset, S);
 end
 
 function cbScPreset(src)
@@ -616,7 +618,7 @@ end
 % Tab 4: run
 % ===========================================================================
 
-function buildRunTab(S)
+function S = buildRunTab(S)
     p = S.tabRun;
     uicontrol(p, 'Style', 'pushbutton', 'String', 'RUN', ...
         'FontSize', 12, 'Position', [20 570 120 36], ...
@@ -632,7 +634,6 @@ function buildRunTab(S)
         'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
         'BackgroundColor', 'w', 'Position', [20 60 920 490], ...
         'String', 'set a plant, a controller and a scenario, then press RUN.');
-    put_(S.runInfo, S);
 end
 
 function cbRun(src)
@@ -812,7 +813,7 @@ end
 % Tab 5: export
 % ===========================================================================
 
-function buildExportTab(S)
+function S = buildExportTab(S)
     p = S.tabExport;
     uicontrol(p, 'Style', 'text', 'String', 'output directory', ...
         'HorizontalAlignment', 'left', 'Position', [20 590 120 20]);
@@ -842,7 +843,6 @@ function buildExportTab(S)
         'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
         'BackgroundColor', 'w', 'Position', [290 60 650 560], ...
         'String', '');
-    put_(S.expDir, S);
 end
 
 function cbBrowse(src)
