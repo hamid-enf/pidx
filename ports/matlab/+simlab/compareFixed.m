@@ -125,7 +125,7 @@ function r = compareFixed(plant, gains, opt)
     end
 
     wrapper = simlab.Q15Loop(simlab.PIDq(cfgQ), sy, su, spEng, dt);
-    rQ = simlab.Sim(plant, wrapper, sc, struct('dt', dt)).run();
+    rQ = simlab.Sim(plant, wrapper, sc, 'dt', dt).run();
 
     % ---- the comparison ----
     r = struct();

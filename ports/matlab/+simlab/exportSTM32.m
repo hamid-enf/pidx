@@ -298,8 +298,9 @@ end
 
 function [txt, o] = buildSource(cfg, o)
     L = {};
-    function a(s)
-        L{end + 1} = s;
+    function a(varargin)
+        L{end + 1} = strjoin(cellfun(@toChar, varargin, ...
+            'UniformOutput', false), '');
     end
     K = pidx.Const;
     P = upper(o.symbol);

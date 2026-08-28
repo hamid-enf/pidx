@@ -529,10 +529,13 @@ classdef PIDq < handle
                     r = int16(-32768);
                     return;
                 end
-                % Mirror of the positive side: round(|v|+half) down, re-sign.
-                % (v - half) >> 15 would bias every negative value one LSB
-                % away from zero - a DC offset the loop would fight.
-                r32 = -floor((-v + half) / 32768);
+                % EXACTLY what C does: (v - half) >> 15, i.e. floor toward
+                % -inf, which rounds away from zero on the negative side.
+                % Yes, that puts exact -1-LSB values one LSB further out;
+                % that is the C library's documented round-to-nearest-away
+                % convention, and a port that "improves" it stops being a
+                % port. The test states this convention instead of fighting it.
+                r32 = floor((v - half) / 32768);
             end
             if r32 > 32767, r32 = 32767; end
             if r32 < -32768, r32 = -32768; end

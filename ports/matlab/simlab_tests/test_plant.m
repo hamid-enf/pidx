@@ -90,8 +90,12 @@ function T = test_plant(T)
         y = pld2.update(1.0, dt);
         % Sample k of the delayed plant equals sample k - nDelay of the
         % undelayed one: the input is held back by exactly the dead time.
-        d = abs(y - hist(k - nDelay));
-        if d > worst, worst = d; end
+        % Before the delay has elapsed the delayed plant is still at zero,
+        % which the earlier all-zero check already pinned.
+        if k > nDelay
+            d = abs(y - hist(k - nDelay));
+            if d > worst, worst = d; end
+        end
     end
     T = simlab_tests.ok(T, worst < 1e-12, ...
         'delayed response equals the undelayed one shifted by %d samples (worst %.3g)', ...

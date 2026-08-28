@@ -213,7 +213,7 @@ function pl = copyChains(src, dst)
 end
 
 
-function m = runOne(pl, g, sc, dt)
+function res = runOne(pl, g, sc, dt)
     cfg = pidx.config('kp', g.kp, 'ki', g.ki, 'kd', g.kd);
     if isfield(g, 'dt') && ~isempty(g.dt)
         cfg.core.sample_time = g.dt;
