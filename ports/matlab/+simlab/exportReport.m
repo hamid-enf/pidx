@@ -57,7 +57,10 @@ function writeCsv(path, r)
     M = nan(n, numel(cols));
     for j = 1:numel(cols)
         if isfield(r, cols{j}) && numel(r.(cols{j})) == n
-            M(:, j) = double(r.(cols{j}))(:);
+            % MATLAB cannot chain an index onto a function result
+            % (double(x)(:) is a parse error), so bind first.
+            v = double(r.(cols{j}));
+            M(:, j) = v(:);
         end
     end
     fid = fopen(path, 'w');
