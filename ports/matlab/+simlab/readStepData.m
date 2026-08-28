@@ -260,7 +260,7 @@ function M = dlmread2(path, delim, hasHeader)
     while true
         line = fgetl(fid);
         if ~ischar(line), break; end
-        line = stripComma(line);
+        line = stripComma(line, delim);
         if isempty(strtrim(line)), continue; end
         n = n + 1;
         rows{n} = strsplit(line, delim);

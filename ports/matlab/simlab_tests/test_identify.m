@@ -142,20 +142,21 @@ end
 
 function d = fopdtStep(K_, tau, L, du, dt, n, sigma)
 % The analytic FOPDT step response, sampled. The ground truth for the fit.
+% The command steps at t = 5 s, INSIDE the record: a step at sample 1 would
+% give identify no pre-step baseline and no observable step instant, which
+% is exactly the historian case it must handle honestly.
+    t0 = 5;
     t = (0:n - 1).' * dt;
     y = zeros(n, 1);
     for k = 1:n
-        if t(k) > L
-            y(k) = K_ * du * (1 - exp(-(t(k) - L) / tau));
+        if t(k) > t0 + L
+            y(k) = K_ * du * (1 - exp(-(t(k) - t0 - L) / tau));
         end
     end
     if sigma > 0
         y = y + sigma * randn(n, 1);
     end
-    % The command is part of the record: identify anchors the moment
-    % integrals at the step instant, and without u it can only guess it from
-    % the departure, which shortens the dead time.
-    d = struct('t', t, 'y', y, 'u', du * ones(n, 1));
+    d = struct('t', t, 'y', y, 'u', du * (t >= t0));
 end
 
 function d = secondOrderStep(dt, n)

@@ -30,7 +30,7 @@ function T = test_fixed(T)
     % ==================================================================
     % 1. full trace
     % ==================================================================
-    cfg = Q.configDefault();
+    cfg = simlab.PIDq.configDefault();
     cfg.kp_q16 = Q.fToQ16(1.5);
     cfg.ki_q16 = Q.fToQ16(4.0);
     cfg.kd_q16 = Q.fToQ16(0.01);
@@ -43,7 +43,7 @@ function T = test_fixed(T)
     cfg.aw_mode = Q.AW_BACK_CALC;
     cfg.bc_shift = 4;
 
-    q = Q(cfg);
+    q = simlab.PIDq(cfg);
     T = simlab_tests.ok(T, q.isValid(), 'PIDq initialises');
 
     % The Q15 limits are quantised, so -0.9 is not exactly representable.
@@ -87,7 +87,7 @@ function T = test_fixed(T)
     % ==================================================================
     % 2. integral resolution death
     % ==================================================================
-    cfg2 = Q.configDefault();
+    cfg2 = simlab.PIDq.configDefault();
     cfg2.kp_q16 = 0;                  % pure integrator: only I can move
     cfg2.ki_q16 = Q.fToQ16(0.5);
     cfg2.kd_q16 = 0;
@@ -95,7 +95,7 @@ function T = test_fixed(T)
     cfg2.out_min_q15 = Q.fToQ15(-0.9);
     cfg2.out_max_q15 = Q.fToQ15(0.9);
 
-    q2 = Q(cfg2);
+    q2 = simlab.PIDq(cfg2);
     q2.setSetpoint(int16(1));         % ONE LSB of error
     first = -1;
     prev = 0;
@@ -125,12 +125,12 @@ function T = test_fixed(T)
     % ==================================================================
     % 3. configurations the format cannot represent
     % ==================================================================
-    cfgBad = Q.configDefault();
+    cfgBad = simlab.PIDq.configDefault();
     cfgBad.ki_q16 = int32(2000000);      % Ki ~ 30.5
     cfgBad.dt_us = 100000;               % 100 ms: Ki*dt ~ 3.05 > 2.0
     threw = false;
     try
-        Q(cfgBad);
+        simlab.PIDq(cfgBad);
     catch
         threw = true;
     end
@@ -142,24 +142,24 @@ function T = test_fixed(T)
             'the C refuses it with ERR_INVALID_GAIN');
     end
 
-    cfgBad2 = Q.configDefault();
+    cfgBad2 = simlab.PIDq.configDefault();
     cfgBad2.deadband_q15 = 100;
     cfgBad2.separation_q15 = 50;         % below the deadband: no window left
     threw2 = false;
     try
-        Q(cfgBad2);
+        simlab.PIDq(cfgBad2);
     catch
         threw2 = true;
     end
     T = simlab_tests.ok(T, threw2, ...
         'separation at or below the deadband is refused: the integrator could never run');
 
-    cfgBad3 = Q.configDefault();
+    cfgBad3 = simlab.PIDq.configDefault();
     cfgBad3.aw_mode = Q.AW_BACK_CALC;
     cfgBad3.bc_shift = 0;
     threw3 = false;
     try
-        Q(cfgBad3);
+        simlab.PIDq(cfgBad3);
     catch
         threw3 = true;
     end
@@ -169,12 +169,12 @@ function T = test_fixed(T)
     % ==================================================================
     % 4. manual -> automatic transfer
     % ==================================================================
-    cfg4 = Q.configDefault();
+    cfg4 = simlab.PIDq.configDefault();
     cfg4.kp_q16 = Q.fToQ16(2.0);
     cfg4.ki_q16 = Q.fToQ16(1.0);
     cfg4.dt_us = 1000;
     cfg4.mode = Q.MODE_MANUAL;
-    q4 = Q(cfg4);
+    q4 = simlab.PIDq(cfg4);
     q4.setSetpoint(Q.fToQ15(0.5));
     q4.setManualOutput(Q.fToQ15(0.25));
     uMan = double(q4.update(Q.fToQ15(0.1)));

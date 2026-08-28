@@ -104,12 +104,10 @@ function results = test_suite(varargin)
             T.failed = T.failed + 1;
             fprintf('ERROR\n');
             where = '';
-            for jf = 1:numel(err.stack)
-                % The first frame inside simlab code, not the harness.
-                if ~isempty(strfind(err.stack(jf).file, 'simlab')) %#ok<STREMP>
-                    where = sprintf(' [%s:%d]', err.stack(jf).name, err.stack(jf).line);
-                    break;
-                end
+            nf = min(3, numel(err.stack));
+            for jf = 1:nf
+                where = [where, sprintf(' [%s:%d]', ...
+                    err.stack(jf).name, err.stack(jf).line)]; %#ok<AGROW>
             end
             T.details{end + 1} = sprintf('%s: %s%s', name, err.message, where); %#ok<AGROW>
             if verbose

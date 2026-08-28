@@ -530,9 +530,9 @@ classdef Plant < handle
         end
 
         function v = transportDelay(o)
-            % Dead time configured on the plant, in seconds. Note this is the
-            % INPUT delay; the sensor's own delay is sensorParam('delay').
-            v = o.delay_s;
+            % Model dead time plus any extra input delay, in seconds. The
+            % sensor's own delay is sensorParam('delay'), a separate line.
+            v = o.p_L + o.delay_s;
         end
 
         function v = tau(o)
@@ -625,9 +625,14 @@ classdef Plant < handle
         end
 
         function rebuildDelays(o)
+            % The model dead time p_L is realised by the INPUT delay line -
+            % that is what makes a plant created with 'l', 12 actually behave
+            % with 12 s of dead time. The first three real test runs all
+            % traced back to this wire being missing: p_L was reported by
+            % polesZeros but never delayed anything.
             n = 0;
             if o.dt > 0
-                n = round(o.delay_s / o.dt);
+                n = round((o.p_L + o.delay_s) / o.dt);
             end
             if n ~= o.delay_n
                 o.delay_n = n;

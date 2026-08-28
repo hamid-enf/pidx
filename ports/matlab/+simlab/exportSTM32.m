@@ -51,6 +51,7 @@ function out = exportSTM32(plant, cfg, opt)
     o = fillOpt(o, 'profile', 'FULL');
     o = fillOpt(o, 'result', []);
     o = fillOpt(o, 'sens', []);
+    o = fillOpt(o, 'tune', []);
     o = fillOpt(o, 'gains', []);
     o = fillOpt(o, 'extra', {});
     o = fillOpt(o, 'cascade', []);

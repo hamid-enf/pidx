@@ -80,25 +80,34 @@ function m = identify(data, opt)
 
     % ---- the step amplitude ----
     %
-    % From the command if it was logged, otherwise from the response itself.
-    % Refusing to guess when neither is available is the point: K is
-    % dy/du, and a du taken from the wrong place scales every gain the tuning
-    % rules produce.
-    du = [];
+    % From the command if it was logged AND it actually moves. A historian
+    % export often starts AFTER the step, in which case u is a constant and
+    % its span is zero - the amplitude must then come from 'uStep'. Refusing
+    % to guess when neither is available is the point: K = dy/du, and a du
+    % taken from the wrong place scales every gain the rules produce.
+    duU = [];
     if ~isempty(u)
-        du = max(u) - min(u);
-        if ~isempty(o.uStep) && abs(abs(o.uStep) - du) > 0.02 * abs(du)
+        duU = max(u) - min(u);
+        if duU <= 0
+            duU = [];
+        end
+    end
+    if ~isempty(duU)
+        du = duU;
+        if ~isempty(o.uStep) && abs(abs(o.uStep) - du) > 0.02 * du
             w{end + 1} = sprintf( ...
                 ['the logged command spans %.6g but ''uStep'' says %.6g. ' ...
                  'Using the logged command.'], du, o.uStep);
         end
     elseif ~isempty(o.uStep)
-        du = o.uStep;
+        du = abs(o.uStep);
+    else
+        du = [];
     end
-    if isempty(du) || du == 0
+    if isempty(du)
         error('simlab:identify:noStep', ...
-              ['no step amplitude: the data has no .u column and ''uStep'' ' ...
-               'was not given. K = dy/du needs du.']);
+              ['no step amplitude: the data has no moving .u column and ' ...
+               '''uStep'' was not given. K = dy/du needs du.']);
     end
 
     % ---- step time ----
@@ -109,7 +118,7 @@ function m = identify(data, opt)
     % the failure the first real test run showed (L = 0.5 against 12).
     % With a logged command the step instant is known exactly; without one
     % only the departure is available, and L then comes out short - say so.
-    if ~isempty(u)
+    if ~isempty(u) && (max(u) - min(u)) > 0
         ddu = find(abs(diff(u)) > 1e-12 * max(1, max(abs(u))), 1, 'first');
         if isempty(ddu)
             kStep = 1;

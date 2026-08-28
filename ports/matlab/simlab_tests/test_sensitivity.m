@@ -32,8 +32,13 @@ function T = test_sensitivity(T)
         'phase margin is 180 - atan(wc) = %.2f deg', pmExpected);
     T = simlab_tests.ok(T, isinf(s1.gm), ...
         'a first-order loop with no delay has an infinite gain margin');
-    T = simlab_tests.near(T, s1.Ms, 1 / sin(atan(wc)), 2e-2, ...
-        'Ms = 1/sin(pm) for this loop');
+    % Ms = 1/sin(PM) is a geometric LOWER BOUND relation for typical loops,
+    % not an equality. For this loop |S| = sqrt(1+w^2)/sqrt(9+w^2) rises
+    % monotonically to 1 at infinite frequency, so the true Ms is 1: a test
+    % that asserted 1.1547 would be asserting the bound as if it were the
+    % value.
+    T = simlab_tests.ok(T, s1.Ms >= 1 && s1.Ms < 1.05, ...
+        'Ms of the 2/(1+s) loop is its true value ~1 (%.4f), not the bound', s1.Ms);
     % Ms = 1/|1+L| at the point closest to -1; for a first-order loop the
     % closest approach is at the crossover, giving 1/sin(pm).
 

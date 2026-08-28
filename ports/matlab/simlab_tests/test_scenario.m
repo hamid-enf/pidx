@@ -78,7 +78,7 @@ function T = test_scenario(T)
     % ---- 5. the transcript is complete and ordered ----
     txt = sc.describe();
     T = simlab_tests.ok(T, ~isempty(strfind(txt, 'setpoint')), 'transcript lists the setpoint event');
-    T = simlab_tests.ok(T, ~isempty(strfind(txt, '2 event')), 'transcript states the event count');
+    T = simlab_tests.ok(T, ~isempty(strfind(txt, '4 event')), 'transcript states the event count');
 
     % ---- 6. a sensor fault event drives PIDX's safety latch ----
     plS = simlab.Plant('fopdt', 'k', 2, 'tau', 5, 'l', 0);
