@@ -9,6 +9,7 @@
 #   make sim       run the simulation studies
 #   make bench     run the host benchmark and the size report
 #   make ports     cross-language conformance: C vs Python vs Octave vs Mono
+#   make simlab    check the MATLAB simulation tool (no MATLAB needed)
 #   make gate      the full warning gate: every file, every profile, -Os/-O2
 #   make all       test + examples + sim + bench + ports
 #   make clean     remove every build artifact
@@ -17,10 +18,11 @@
 # itself into /usr/local is a library that will be the wrong version on
 # somebody's board.
 
-.PHONY: all test examples sim bench ports gate clean distclean help
+.PHONY: all test examples sim bench ports gate clean distclean help \
+        simlab simlab-ref simlab-hil
 
 help:
-	@echo "PIDX - targets: test examples sim bench ports gate all clean"
+	@echo "PIDX - targets: test examples sim bench ports gate simlab all clean"
 	@echo "The library needs no build system; this drives host artifacts."
 
 all: test examples sim bench ports
@@ -41,6 +43,29 @@ bench:
 # toolchain is absent is named as skipped rather than passed over in silence.
 ports:
 	@$(MAKE) -C ports compare
+
+# The MATLAB simulation workbench in ports/matlab/+simlab.
+#
+# This target does NOT run MATLAB: it runs the two checks that need no
+# interpreter, so the tool stays verifiable on a machine without one. The
+# numeric suite - ports/matlab/simlab_tests/test_suite.m - compares against
+# the reference built by `make simlab-ref` and must be run in MATLAB/Octave.
+simlab:
+	@echo "=== simlab: structural lint ==="
+	@python3 tools/matlab_lint.py ports/matlab
+	@echo ""
+	@echo "=== simlab: exported identifiers vs include/pidx/ ==="
+	@python3 tools/check_export_identifiers.py
+
+# Rebuild the C oracle and the reference numbers the MATLAB tests assert on.
+simlab-ref:
+	@$(MAKE) -C tools/matlab_ref run
+
+# Build and drive the HIL firmware through a full protocol session on the
+# host. Needs a generated tuning file:
+#   make simlab-hil TUNING=/path/to/pidx_tuning_myLoop.h SYMBOL=myLoop
+simlab-hil:
+	@$(MAKE) -C tools/hil smoke $(if $(TUNING),TUNING=$(TUNING),) $(if $(SYMBOL),SYMBOL=$(SYMBOL),)
 
 # The warning gate. Compiles every source file on its own, under every
 # compile-time profile, at both -Os and -O2, with warnings as errors.

@@ -175,6 +175,7 @@ include/pidx/   13 public headers
 src/            9 implementation files, zero HAL dependency
 platform/       optional STM32, ESP32 and POSIX integration
 ports/          Python, MATLAB/Octave and C# ports + conformance harness
+                + the MATLAB simulation workbench (ports/matlab/+simlab)
 examples/       11 compilable examples
 tests/          17 suites, 816 assertions
 sim/            3 simulation studies + plotting
@@ -224,6 +225,40 @@ engine, Q15/Q31 fixed point and the lock-free telemetry ring are deliberately
 
 ---
 
+## MATLAB simulation and tuning workbench
+
+`ports/matlab/+simlab` builds on the verified port: plant models with real
+sensor and actuator chains, a scenario engine, the auto-tune state machine,
+Monte Carlo robustness, frequency-domain margins, and an exporter that writes
+**compilable C for STM32CubeIDE** — the loop is tuned in MATLAB and the gains
+reach the board without being retyped.
+
+```matlab
+cd ports/matlab && simlab_setup
+simlab_demos.demo_quick      % plant -> identify -> verify -> export C
+simlab_demos.demo_design     % design to a specification, then price it
+simlab_wizard                % the same workflow, driven from the console
+simlabApp                    % ... or from a GUI
+```
+
+Also: `simlab.identify` fits a FOPDT to a recorded step; `simlab.designByGoal`
+searches the IMC lambda family for gains that meet an overshoot / settling /
+Ms specification and says which constraint binds when none do; `simlab.PIDq`
+and `simlab.compareFixed` price the Q15 version; `simlab.hilRun` runs a
+scenario with the controller on the board and `simlab.hilCompare` triages the
+difference.
+
+The generated C is not a paraphrase: `simlab_tests/test_export.m` compiles it
+against `include/pidx/`, links it with `src/*.c`, feeds both sides the same
+measurements and compares. The numeric tests compare against a reference
+produced by `tools/matlab_ref/`, which runs the same scenarios through the C
+library — the oracle, because it is what the STM32 runs.
+
+See [`ports/matlab/SIMLAB_README.md`](ports/matlab/SIMLAB_README.md) and
+`docs/25_matlab_simlab.md`.
+
+---
+
 ## Step-by-step examples (STM32, Persian)
 
 A separate set of 10 runnable examples built for learning PIDX from scratch on an
@@ -249,7 +284,7 @@ Start with `docs/02_quickstart.md`.
 | `15_safety_diagnostics.md` | `16_fixed_point.md` | `17_performance.md` |
 | `18_stm32_integration.md` | `19_rtos_isr.md` | `20_troubleshooting.md` |
 | `21_api_reference.md` | `22_misra_deviations.md` | `23_ports.md` |
-| `24_port_comparison.md` | | |
+| `24_port_comparison.md` | `25_matlab_simlab.md` | |
 
 ---
 
