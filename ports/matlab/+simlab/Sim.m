@@ -119,7 +119,18 @@ classdef Sim < handle
             end
 
             % ---- phase 2: the scenario ----
-            n = max(1, round(o.scenario.tEnd / dt));
+            n = round(o.scenario.tEnd / dt);
+            if n < 2
+                % A one-sample "run" is not a run, and everything downstream
+                % (metrics, plots) degenerates on it. Name the two numbers
+                % that produced it, because that is the whole diagnosis.
+                error('simlab:Sim:tooShort', ...
+                    ['the scenario is %.6g s long but the sample time is ' ...
+                     '%.6g s, which gives %d sample(s). Either the duration ' ...
+                     'field on the Scenario tab is wrong or the controller ' ...
+                     'dt is - a run needs at least 2 samples.'], ...
+                    o.scenario.tEnd, dt, max(n, 0));
+            end
             r = o.newResult(n, dt);
 
             spCmd = 0;            % commanded setpoint (pre-ramp)

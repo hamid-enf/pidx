@@ -185,6 +185,12 @@ end
 
 function pl = copyChains(src, dst)
 % Re-apply the sensor and actuator configuration of SRC onto DST.
+%
+% dst is a handle object, so the setters below mutate it in place; but the
+% caller writes `pl = copyChains(...)` and MATLAB requires the output to be
+% assigned on EVERY path - the missing assignment was a runtime error the
+% first time Monte Carlo ran under real MATLAB.
+    pl = dst;
     [lo, hi] = src.actuatorLimits();
     if isfinite(lo) || isfinite(hi)
         dst.setActuatorLimits(lo, hi);

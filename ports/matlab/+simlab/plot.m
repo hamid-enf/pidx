@@ -175,7 +175,11 @@ function plotFlagBands(ax, r)
     else
         set(ax, 'YTick', 1:y, 'YTickLabel', shown);
     end
-    xlim(ax, [t(1), t(end)]);
+    if t(end) > t(1)
+        xlim(ax, [t(1), t(end)]);
+    else
+        xlim(ax, [t(1) - 1, t(1) + 1]);
+    end
     ylim(ax, [0.3, max(y, 1) + 0.4]);
     title(ax, sprintf('PIDX status flags   (%.1f%% of samples saturated)', ...
                       100 * r.metrics.satFraction));
