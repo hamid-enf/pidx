@@ -237,9 +237,7 @@ function s = transcript(r)
 end
 
 function o = fillOpt(o, name, default)
-    if isfield(opt, name) && ~isempty(opt.(name))
-        o.(name) = opt.(name);
-    else
+    if ~isfield(o, name) || isempty(o.(name))
         o.(name) = default;
     end
 end

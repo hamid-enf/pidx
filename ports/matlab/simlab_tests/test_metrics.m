@@ -64,9 +64,23 @@ function T = test_metrics(T)
         m2.settlingTime);
 
     % ---- IAE ----
-    T = simlab_tests.near(T, m.iae, trapz(t, abs(r.r - r.y)), 1e-12, 'IAE is trapz(|e|)');
-    T = simlab_tests.near(T, m.ise, trapz(t, (r.r - r.y).^2), 1e-9, 'ISE is trapz(e^2)');
-    T = simlab_tests.near(T, m.itae, trapz(t, t .* abs(r.r - r.y)), 1e-9, 'ITAE is trapz(t|e|)');
+    % The explicit trapezoid, written out here so the test states the rule
+    % rather than calling the same helper the code uses.
+    ee = abs(r.r - r.y);
+    T = simlab_tests.near(T, m.iae, ...
+        sum(0.5 * (ee(1:end-1) + ee(2:end)) .* diff(t)), 1e-12, 'IAE is the trapezoid of |e|');
+    ee2 = (r.r - r.y).^2;
+    T = simlab_tests.near(T, m.ise, ...
+        sum(0.5 * (ee2(1:end-1) + ee2(2:end)) .* diff(t)), 1e-9, 'ISE is the trapezoid of e^2');
+    ee3 = t .* abs(r.r - r.y);
+    T = simlab_tests.near(T, m.itae, ...
+        sum(0.5 * (ee3(1:end-1) + ee3(2:end)) .* diff(t)), 1e-9, 'ITAE is the trapezoid of t|e|');
+    % Analytic cross-check: a triangular error of height 1 and base 2 has
+    % area exactly 1, which is what any correct trapezoid must return.
+    tt = linspace(0, 2, 1001);
+    tri = max(0, 1 - abs(tt - 1));
+    T = simlab_tests.near(T, sum(0.5 * (tri(1:end-1) + tri(2:end)) .* diff(tt)), 1, 1e-12, ...
+        'the trapezoid of a unit triangle is 1');
 
     % ---- total variation ----
     u = sin(2 * pi * t);

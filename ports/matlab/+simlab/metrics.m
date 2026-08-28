@@ -45,10 +45,14 @@ function m = metrics(r, opt)
     n = numel(t);
 
     % ---------------- integral metrics: always defined ----------------
+    % Explicit trapezoid, not trapz(): with a single sample trapz(X,Y) is
+    % parsed as trapz(Y,dim) and dies on the dimension argument. The explicit
+    % sum is unambiguous, correct on non-uniform grids, and returns 0 for a
+    % degenerate run instead of erroring.
     e = sp - y;
-    m.iae = trapz(t, abs(e));
-    m.ise = trapz(t, e.^2);
-    m.itae = trapz(t, t .* abs(e));
+    m.iae = trapez(t, abs(e));
+    m.ise = trapez(t, e.^2);
+    m.itae = trapez(t, t .* abs(e));
 
     % ---------------- actuator metrics: always defined ----------------
     if ~isempty(u) && numel(u) == n
@@ -140,7 +144,7 @@ function m = metrics(r, opt)
     m.ssStd = std(tailY);
 
     % ---------------- IAE from the step ----------------
-    m.iaeStep = trapz(tn, abs(y1 - yt));
+    m.iaeStep = trapez(tn, abs(y1 - yt));
 
     m.stable = isStable(y, max(1, abs(step)), opt);
 end
@@ -177,4 +181,13 @@ function ok = isStable(y, scale, opt)
     if (max(tail) - min(tail)) > opt.quiet * 2 * scale
         ok = false;
     end
+end
+
+function a = trapez(t, v)
+% Unambiguous trapezoidal integral of v over t. 0 for fewer than two points.
+    if numel(t) < 2
+        a = 0;
+        return;
+    end
+    a = sum(0.5 * (v(1:end-1) + v(2:end)) .* diff(t));
 end

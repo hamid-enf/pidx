@@ -558,12 +558,7 @@ function s = integName(m)
 end
 
 function o = fillOpt(o, name, default)
-    if isfield(opt, name) && ~isempty(opt.(name))
-        o.(name) = opt.(name);
-    else
+    if ~isfield(o, name) || isempty(o.(name))
         o.(name) = default;
-    end
-    if ~isfield(o, 'dropped')
-        o.dropped = {};
     end
 end
