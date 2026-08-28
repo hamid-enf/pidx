@@ -159,6 +159,17 @@ def lint_file(path):
     with open(path, encoding="utf-8", errors="replace") as fh:
         lines = fh.read().split("\n")
 
+    # An empty or stub file is a structural problem too, and the most
+    # dangerous one: it parses perfectly, lints clean, and silently does
+    # nothing. A demo emptied by a bad edit passed every other check in this
+    # script, which is why this check exists.
+    code_lines = [ln for ln in lines if strip_comment(ln)[0].strip()]
+    if len(code_lines) == 0:
+        return ["%s: file contains no code at all" % path]
+    if len(code_lines) < 3:
+        problems.append("%s: only %d line(s) of code - a stub?"
+                        % (path, len(code_lines)))
+
     try:
         lls = list(logical_lines(lines))
     except SyntaxError as exc:
