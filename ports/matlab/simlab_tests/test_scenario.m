@@ -36,16 +36,19 @@ function T = test_scenario(T)
     % has already settled, so the only thing that can make the trace move is
     % the noise the event added - comparing during the transient would measure
     % the response instead.
-    scN = simlab.Scenario('noise only', 12.0);
+    scN = simlab.Scenario('noise only', 30.0);
     scN.setpoint(50, 0);
-    scN.noise(0.4, 6.0);
+    scN.noise(0.4, 20.0);
     rN = simlab.Sim(simlab.Plant('fopdt', 'k', 2, 'tau', 1, 'l', 0), ...
                     pidx.PID(pidx.config('kp', 1, 'ki', 0.5, 'dt', dt)), scN).run();
-    k3 = round(6.0 / dt) + 1;
-    before = std(rN.y(k3 - 60:k3 - 1));
-    after = std(rN.y(k3 + 20:k3 + 80));
+    kA = round(15.0 / dt) + 1;
+    kB = round(20.0 / dt);
+    kC = round(21.0 / dt) + 1;
+    kD = round(24.0 / dt);
+    before = std(rN.y(kA:kB));
+    after = std(rN.y(kC:kD));
     T = simlab_tests.ok(T, after > 20 * max(before, 1e-12), ...
-        'the noise event at t = 6 s is visible once the loop has settled (sigma %.3g -> %.3g)', ...
+        'the noise event at t = 20 s is visible on a settled loop (sigma %.3g -> %.3g)', ...
         before, after);
 
     % ---- 2. events at t = 0 shape the FIRST sample ----

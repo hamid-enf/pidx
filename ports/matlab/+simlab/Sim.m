@@ -119,6 +119,10 @@ classdef Sim < handle
             end
 
             % ---- phase 2: the scenario ----
+            % Events carry a 'done' flag from the previous run; a scenario
+            % object reused for a second run (the app does this on every Run
+            % press) would otherwise fire nothing the second time.
+            o.scenario.clearDone();
             % An Inf horizon (integrating plant) makes n Inf, and `Inf < 2`
             % is false, so the old guard let zeros(1, Inf) through to its own
             % error. Finite-ness is part of the check.

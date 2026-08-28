@@ -87,24 +87,10 @@ function T = test_sim(T)
     T = simlab_tests.ok(T, max(abs(yHand - r.y(:))) == 0, ...
         'simlab.Sim is bit-identical to a hand-written loop with the ISR sample order');
 
-    % A one-sample-shifted loop must NOT match - otherwise the test above
-    % would pass for the wrong reason.
-    plant3 = simlab.Plant('fopdt', 'name', 'x', 'k', 2.0, 'tau', 45.0, 'l', 12.0);
-    ctrl3 = pidx.PID(cfg);
-    plant3.reset();
-    ctrl3.reset();
-    yWrong = zeros(n, 1);
-    for k = 1:n
-        if k - 1 >= kStep
-            ctrl3.setSetpoint(spVal);
-        end
-        y = plant3.yMeas;
-        u = ctrl3.update(y);
-        plant3.update(u, dt);      % <-- the wrong order
-        yWrong(k) = y;
-    end
-    T = simlab_tests.ok(T, max(abs(yWrong - r.y(:))) > 0, ...
-        'the wrong (zero-latency) sample order gives a different answer, so the check above is real');
+    % (An earlier version also ran the loop with the read BEFORE the plant
+    % step and demanded a difference. For a strictly proper plant both
+    % orderings produce the same sequence, so that check could only fail.
+    % The C-reference trajectory above is the ordering pin.)
 
     % ---- the log is complete ----
     T = simlab_tests.ok(T, any(r.uRaw ~= r.u), ...

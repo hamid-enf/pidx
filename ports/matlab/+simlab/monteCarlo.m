@@ -75,9 +75,10 @@ function r = monteCarlo(plant, gains, opt)
             g.kd = gains.kd * fg(3);
         end
 
-        m = runOne(pl, g, sc, o.dt);
+        res = runOne(pl, g, sc, o.dt);
+        m = res.metrics;
         tab(i, :) = [f, m.stable, m.iae, m.overshoot, m.settlingTime];
-        logs{i} = m;
+        logs{i} = res;
 
         if o.verbose && mod(i, max(1, floor(n / 10))) == 0
             fprintf('  monteCarlo: %d/%d runs, %d%% survived so far\n', ...
@@ -109,7 +110,7 @@ function r = monteCarlo(plant, gains, opt)
     r.worstPlant = tab(iw, 1:3);
     r.worstLog = logs{iw};
 
-    r.nominal = runOne(plant, gains, sc, o.dt);
+    r.nominal = runOne(plant, gains, sc, o.dt).metrics;
 
     if o.verbose
         fprintf(['  monteCarlo: %.0f%% of %d plants stable; median IAE ' ...
@@ -239,9 +240,6 @@ function m = runOne(pl, g, sc, dt)
     if isfield(g, 'tf') && g.tf > 0
         c.setDerivativeFilter(g.tf);
     end
-    sim = simlab.Sim(pl, c, sc);
-    res = sim.run();
-    m = res.metrics;
-    m.stable = logical(m.stable);
-    m.log = res;
+    res = simlab.Sim(pl, c, sc).run();
+    res.metrics.stable = logical(res.metrics.stable);
 end

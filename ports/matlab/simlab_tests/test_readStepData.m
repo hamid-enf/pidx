@@ -155,7 +155,7 @@ function T = test_readStepData(T)
     % ==================================================================
     % The struct readStepData returns must drop straight into identify.
     fid = fopen(fullfile(tmp, 'simlab_ident.csv'), 'w');
-    for k = 0:1199
+    for k = 0:5999
         t = k * 0.1;
         u = 20 + 30 * (t >= 50);
         y = 0;

@@ -293,15 +293,22 @@ function model = relayIdentify(plant, dt, o)
 
     cfg = simlab.AutoTune.configDefault(K.IDENT_RELAY);
     cfg.rule = K.RULE_ZN;              % any FREQ rule; the model is what matters
-    cfg.output_step = max(0.05 * plantActuatorSpan(plant), 1e-3);
+    span = plantActuatorSpan(plant);
+    cfg.output_step = max(0.2 * span, 1e-3);
+    % The relay must swing about the OPERATING POINT, not about zero: with
+    % auto_bias on a fresh controller the bias is 0 and the relay oscillates
+    % around the wrong level - tiny asymmetric cycles that the quality gate
+    % then (correctly) refuses. Mid-span bias, no clamp, is the honest rig.
+    cfg.auto_bias = false;
+    cfg.bias = 0.5 * span;
     cfg.output_min = 0;
     cfg.output_max = 0;                % no clamp during identification
-    cfg.timeout_s = 60 * max(1, plant.tau());
+    cfg.timeout_s = 60 * max(1, plant.tau() + plant.transportDelay());
     cfg.skip_stabilize = true;
 
     at = simlab.AutoTune(cfg);
     c = pidx.PID(pidx.config('dt', dt));
-    sp = plant.steadyStateGain() * cfg.output_step;
+    sp = plant.steadyStateGain() * cfg.bias;
     at.start(c, sp);
 
     y = 0;

@@ -20,6 +20,6 @@ function run_tests(varargin)
     % A build marker in every paste. If the marker in your output does not
     % match the latest commit's marker, the folder is stale and the failures
     % are ghosts.
-    fprintf('=== simlab build 674f8f7+fixes-2 ===\n');
+    fprintf('=== simlab build dde84eb+fixes-4 ===\n');
     test_suite(varargin{:});
 end

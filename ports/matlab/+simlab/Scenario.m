@@ -163,6 +163,16 @@ classdef Scenario < handle
             s = sprintf('%s\n', lines{:});
         end
 
+        function clearDone(o)
+            % Reset the per-run 'done' flags. The events themselves are the
+            % script and survive; only their bookkeeping is per-run.
+            for i = 1:numel(o.ev)
+                e = o.ev{i};
+                e.done = false;
+                o.ev{i} = e;
+            end
+        end
+
         function tv = times(o)
             tv = zeros(1, o.nEvents);
             for i = 1:o.nEvents

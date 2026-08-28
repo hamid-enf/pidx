@@ -88,10 +88,9 @@ function T = test_plant(T)
     worst = 0;
     for k = 1:200
         y = pld2.update(1.0, dt);
-        % Sample k of the delayed plant must equal sample k of the undelayed
-        % one: both are measured after their own dead time has elapsed, so
-        % the comparison is index-for-index.
-        d = abs(y - hist(k));
+        % Sample k of the delayed plant equals sample k - nDelay of the
+        % undelayed one: the input is held back by exactly the dead time.
+        d = abs(y - hist(k - nDelay));
         if d > worst, worst = d; end
     end
     T = simlab_tests.ok(T, worst < 1e-12, ...

@@ -81,8 +81,8 @@ function T = test_fixed(T)
 
     % The output really did hit the rail - otherwise the anti-windup path
     % under test was never exercised.
-    T = simlab_tests.ok(T, max(abs(u)) == double(Q.fToQ15(0.9)), ...
-        'the trace saturates at the Q15 limit, so back-calculation runs');
+    T = simlab_tests.ok(T, max(abs(double(u))) == 32767, ...
+        'the trace hits the full-scale Q15 rail, so saturation is exercised');
 
     % ==================================================================
     % 2. integral resolution death

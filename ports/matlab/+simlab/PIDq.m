@@ -529,7 +529,10 @@ classdef PIDq < handle
                     r = int16(-32768);
                     return;
                 end
-                r32 = floor((v - half) / 32768);
+                % Mirror of the positive side: round(|v|+half) down, re-sign.
+                % (v - half) >> 15 would bias every negative value one LSB
+                % away from zero - a DC offset the loop would fight.
+                r32 = -floor((-v + half) / 32768);
             end
             if r32 > 32767, r32 = 32767; end
             if r32 < -32768, r32 = -32768; end
