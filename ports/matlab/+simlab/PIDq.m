@@ -512,19 +512,24 @@ classdef PIDq < handle
             % In a loop that closes around this output the bias behaves like a
             % small constant disturbance, so the rounding term is not
             % cosmetic.
+            % MATLAB has no int64 widening multiply/shift on doubles, and
+            % bitshift() refuses double input entirely - so the shift is
+            % stated as floor division, which is bit-exact for integers in
+            % the double range (everything here is < 2^53).
             half = 2^(30 - 15 - 1);
-            if v_q30 >= 0
-                if v_q30 > 2147483647 - half
+            v = double(v_q30);
+            if v >= 0
+                if v > 2147483647 - half
                     r = int16(32767);
                     return;
                 end
-                r32 = bitshift(v_q30 + half, -15);
+                r32 = floor((v + half) / 32768);
             else
-                if v_q30 < -2147483648 + half
+                if v < -2147483648 + half
                     r = int16(-32768);
                     return;
                 end
-                r32 = bitshift(v_q30 - half, -15);
+                r32 = floor((v - half) / 32768);
             end
             if r32 > 32767, r32 = 32767; end
             if r32 < -32768, r32 = -32768; end
@@ -558,10 +563,13 @@ classdef PIDq < handle
         end
 
         function y = mulShift(a, b, shift)
+            % double() first: MATLAB int32*int32 SATURATES at int32max where
+            % C widens to int64, and int32*double is a class error. The whole
+            % point of the wide path is that no intermediate saturates.
             % Multiply two fixed-point values and shift back, in 64-bit, with
             % saturation rather than wrap: a wrapped controller output flips
             % sign, which on a real actuator means full reverse.
-            p = a * b;
+            p = double(a) * double(b);
             p = simlab.PIDq.ashift(p, shift);
             if p > 2147483647, p = 2147483647; end
             if p < -2147483648, p = -2147483648; end
@@ -569,7 +577,7 @@ classdef PIDq < handle
         end
 
         function y = addSat(a, b)
-            s = a + b;
+            s = double(a) + double(b);
             if s > 2147483647, s = 2147483647; end
             if s < -2147483648, s = -2147483648; end
             y = s;
@@ -603,7 +611,14 @@ classdef PIDq < handle
             % precision is thrown away first. Every product below stays inside
             % 2^53, so a double represents it exactly.
             K = pidx.Const;
-            num = ki_q16 * dt_us;
+            % The gains arrive as int32 (the Q16.16 format). Every operation
+            % below is done in double: int32*double is a class error in
+            % MATLAB and int32*int32 saturates instead of widening.
+            ki = double(ki_q16);
+            kd = double(kd_q16);
+            dtu = double(dt_us);
+            tfu = double(tf_us);
+            num = ki * dtu;
             num = num * 16384;                       % 2^14
             num = truncDiv(num, 1000000);
             if num > 2147483647 || num < -2147483647
@@ -611,8 +626,8 @@ classdef PIDq < handle
             end
             ci = num;
 
-            den = tf_us + dt_us;                     % > 0, dt_us validated
-            num = kd_q16 * 1000000;
+            den = tfu + dtu;                         % > 0, dt_us validated
+            num = kd * 1000000;
             num = truncDiv(num, den);
             if num > 2147483647 || num < -2147483647
                 % Kd huge relative to Tf+dt: the derivative would dominate
@@ -621,7 +636,7 @@ classdef PIDq < handle
             end
             cb = num;
 
-            num = tf_us * 1073741824;                % 2^30
+            num = tfu * 1073741824;                  % 2^30
             ca = truncDiv(num, den);
             rc = K.OK;
         end

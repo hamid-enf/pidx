@@ -691,12 +691,9 @@ classdef Plant < handle
                 d = c2d(sys, dt, 'zoh');
                 [o.ad_a, o.ad_b, o.ad_c, o.ad_d] = ssdata(d);
                 if isempty(o.xs) || numel(o.xs) ~= size(o.ad_a, 1)
-                    % fopdt holds ONE state; a linear plant holds one per pole.
-            % zeros(size(o.ad_a,1),1) gives the FOPDT an EMPTY state (ad_a is
-            % empty until a c2d runs) and the first update dies on xs(1).
-            % stepLinear() widens this scalar whenever the linear model needs
-            % more, so a plain 0 is the right seed for every kind.
-            o.xs = 0;
+                    % one state per pole; a scalar seed from reset() is
+                    % widened here the first time the linear model runs.
+                    o.xs = zeros(size(o.ad_a, 1), 1);
                 end
                 o.ad_dt = dt;
             end
@@ -856,7 +853,7 @@ classdef Plant < handle
             % struct, i.e. from whatever the auto-tuner just measured. Useful
             % for replaying a tuning session, and for the Monte Carlo study
             % where each plant is a perturbed identification.
-            if ~strcmp(model.kind, 'fopdt')
+            if model.kind ~= pidx.Const.MODEL_FOPDT
                 error('simlab:Plant:needFopdt', ...
                       'fromIdentified needs a MODEL_FOPDT model');
             end

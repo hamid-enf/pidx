@@ -19,8 +19,16 @@ function T = test_design(T)
     d = simlab.designByGoal(plant, goal, struct('dt', dt, 'scenario', sc, ...
         'nLambda', 15, 'verbose', false));
 
-    T = simlab_tests.ok(T, d.feasible, 'a 10%% overshoot goal is feasible on this plant');
+    T = simlab_tests.ok(T, d.feasible, ...
+        'a 10%% overshoot goal is feasible on this plant (%d simulated, diagnosis: %s)', ...
+        d.nSimulated, d.diagnosis);
     T = simlab_tests.ok(T, ~isempty(d.gains), 'gains were returned');
+    if ~d.feasible
+        % Nothing below can be trusted; say so and stop poking at empties.
+        T = simlab_tests.skip(T, 'design verification (infeasible run)', ...
+            'the goal was not met on this plant');
+        return;
+    end
     T = simlab_tests.ok(T, d.gains.kp > 0, 'Kp = %.5g is positive', d.gains.kp);
     T = simlab_tests.ok(T, d.nSimulated > 0, '%d candidates were simulated', d.nSimulated);
     T = simlab_tests.ok(T, d.nScreened > 0, ...

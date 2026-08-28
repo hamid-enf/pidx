@@ -83,7 +83,7 @@ function d = readStepData(path, opt)
     yCol = resolveCol(o.yCol, names, 2, 'measurement');
     if isempty(o.uCol)
         % Use column 3 only if it exists and is numeric.
-        probe = strsplit(stripComma(second), delim);
+        probe = strsplit(stripComma(second, delim), delim);
         if numel(probe) >= 3 && ~isempty(str2double(probe{3}))
             uCol = 3;
         else
@@ -190,7 +190,7 @@ function c = sniffDelimiter(line)
 end
 
 function tf = isNumericRow(line, delim)
-    parts = strsplit(stripComma(line), delim);
+    parts = strsplit(stripComma(line, delim), delim);
     tf = true;
     for i = 1:numel(parts)
         s = strtrim(parts{i});
@@ -227,10 +227,17 @@ function c = resolveCol(spec, names, default, what)
     c = spec;
 end
 
-function s = stripComma(line)
-% European decimal commas. Detected, not assumed: a comma that separates
-% fields must survive, so this only rewrites a comma that sits between two
-% digits.
+function s = stripComma(line, delim)
+% European decimal commas, for files whose DELIMITER is not a comma.
+%
+% The rewrite (digit-comma-digit -> digit.dot digit) can only run when the
+% comma is not the field separator: on a comma-delimited file it would glue
+% every field into one token and the file would read as a single column.
+% That bug shipped once and cost a whole fixture.
+    if strcmp(delim, ',')
+        s = line;
+        return;
+    end
     s = regexprep(line, '(?<=\d),(?=\d)', '.');
 end
 

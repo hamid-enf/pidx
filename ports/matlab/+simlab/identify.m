@@ -101,6 +101,28 @@ function m = identify(data, opt)
                'was not given. K = dy/du needs du.']);
     end
 
+    % ---- step time ----
+    % The moment integrals must start at the STEP instant, not at the
+    % departure: the residual (y_inf - y) is full sized during the dead time,
+    % and that flat stretch IS the dead time the fit solves for. Start them
+    % at the departure instead and A1 comes up short by ~L, which is exactly
+    % the failure the first real test run showed (L = 0.5 against 12).
+    % With a logged command the step instant is known exactly; without one
+    % only the departure is available, and L then comes out short - say so.
+    if ~isempty(u)
+        ddu = find(abs(diff(u)) > 1e-12 * max(1, max(abs(u))), 1, 'first');
+        if isempty(ddu)
+            kStep = 1;
+        else
+            kStep = ddu;               % last sample before the step
+        end
+    else
+        kStep = [];
+        w{end + 1} = ['no logged command: the step instant is estimated as ' ...
+            'the response departure, so the dead time comes out short by the ' ...
+            'detection lag. Log u for an exact L.'];
+    end
+
     % ---- pre-step baseline ----
     %
     % Averaged over the samples before the response starts to move, not taken
@@ -116,6 +138,13 @@ function m = identify(data, opt)
             'run-up gives a better baseline.'];
     else
         y0 = mean(y(1:kMove - 1));
+    end
+    if ~isempty(kStep)
+        if kStep > 2
+            y0 = mean(y(1:kStep - 1));
+        else
+            y0 = y(1);
+        end
     end
 
     % ---- settling: the same criterion the C uses ----
@@ -210,12 +239,20 @@ function m = identify(data, opt)
     k = dy / du;
 
     % ---- the two moments, midpoint arm, over the settled window ----
-    te = t(kEnd) - t(kMove);
+    % Anchored at the step instant when it is known. The settling loop above
+    % is anchored at the departure, which is the right clock for flatness;
+    % the moments need the step clock, or the dead time never enters A1.
+    if isempty(kStep)
+        kRef = kMove;
+    else
+        kRef = kStep;
+    end
+    te = t(kEnd) - t(kRef);
     area1 = 0;
     moment1 = 0;
-    for kk = (kMove + 1):kEnd
+    for kk = (kRef + 1):kEnd
         yAvg = 0.5 * ((y(kk) - y0) + (y(kk - 1) - y0));
-        tMid = (t(kk) - t(kMove)) - 0.5 * dt;
+        tMid = (t(kk) - t(kRef)) - 0.5 * dt;
         area1 = area1 + yAvg * dt;
         moment1 = moment1 + tMid * yAvg * dt;
     end

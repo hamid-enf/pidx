@@ -112,9 +112,15 @@ end
 % ===========================================================================
 
 function [txt, o] = buildHeader(plant, cfg, o, guard)
+    % An anonymous function cannot contain an assignment, so the line
+    % accumulator is a NESTED function: it shares this function's L and
+    % appends to it. (The first version wrote `a = @(...) L{end+1} = ...`,
+    % which is a parse error MATLAB reports as "Incorrect use of '='".)
     L = {};
-    a = @(varargin) L{end + 1} = strjoin(cellfun(@toChar, varargin, ...
-        'UniformOutput', false), '');  %#ok<*AGROW>
+    function a(varargin)
+        L{end + 1} = strjoin(cellfun(@toChar, varargin, ...
+            'UniformOutput', false), '');
+    end
 
     a('/**');
     a(' * @file    pidx_tuning_', o.symbol, '.h');
@@ -291,7 +297,9 @@ end
 
 function [txt, o] = buildSource(cfg, o)
     L = {};
-    a = @(s) L{end + 1} = s;  %#ok<*AGROW>
+    function a(s)
+        L{end + 1} = s;
+    end
     K = pidx.Const;
     P = upper(o.symbol);
 

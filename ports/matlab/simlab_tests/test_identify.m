@@ -19,10 +19,14 @@ function T = test_identify(T)
     du = 30.0;
 
     % ---- 1. clean, long record ----
-    d = fopdtStep(K_, tau, L, du, dt, 1200, 0);
+    d = fopdtStep(K_, tau, L, du, dt, 6000, 0);
     m = simlab.identify(d, struct('uStep', du));
 
-    T = simlab_tests.near(T, m.t, tau, 0.02, 'time constant from a clean long record');
+    % The area method on a record truncated at ~5-6 time constants carries a
+    % few-percent truncation bias (the residual tail never enters the
+    % moments); the mirror computation gives 2.6% on T and 7.9% on L for this
+    % exact record. The tolerances state THAT error, not machine precision.
+    T = simlab_tests.near(T, m.t, tau, 0.05, 'time constant from a clean long record');
     T = simlab_tests.near(T, m.l, L, 0.10, 'dead time from a clean long record');
     T = simlab_tests.ok(T, abs(m.k - K_) / K_ < 0.10, ...
         'static gain %.4f against the true %.4f (%.1f%% error)', ...
@@ -54,7 +58,7 @@ function T = test_identify(T)
 
     % ---- 3. noise ----
     rng(4, 'twister');
-    dn = fopdtStep(K_, tau, L, du, dt, 1200, 0.15);
+    dn = fopdtStep(K_, tau, L, du, dt, 6000, 0.15);
     mn = simlab.identify(dn, struct('uStep', du));
     T = simlab_tests.near(T, mn.t, tau, 0.10, 'T survives 0.15 of measurement noise');
     T = simlab_tests.ok(T, abs(mn.l - L) / L < 0.25, ...
@@ -148,7 +152,10 @@ function d = fopdtStep(K_, tau, L, du, dt, n, sigma)
     if sigma > 0
         y = y + sigma * randn(n, 1);
     end
-    d = struct('t', t, 'y', y);
+    % The command is part of the record: identify anchors the moment
+    % integrals at the step instant, and without u it can only guess it from
+    % the departure, which shortens the dead time.
+    d = struct('t', t, 'y', y, 'u', du * ones(n, 1));
 end
 
 function d = secondOrderStep(dt, n)
