@@ -586,8 +586,14 @@ function cbScPreset(src)
     names = get(src, 'String');
     which = names{get(src, 'Value')};
     sp = num(get(S.scSp));
-    S.scenario = simlab.Scenario.presets(which, 'sp', sp, ...
-        'tEnd', num(get(S.scEnd)));
+    tEnd = num(get(S.scEnd));
+    if ~(tEnd > 0)
+        % An empty or zero duration field must not produce a zero-length
+        % scenario - that is the "0 samples" dead-end, renamed.
+        tEnd = defaultHorizon(S.plant);
+        say(S, 'duration was not usable - using %.5g s (12x tau+L)', tEnd);
+    end
+    S.scenario = simlab.Scenario.presets(which, 'sp', sp, 'tEnd', tEnd);
     set(S.scList, 'String', S.scenario.describe());
     say(S, 'scenario "%s" built - %d events over %.4g s', which, ...
         S.scenario.nEvents, S.scenario.tEnd);
@@ -599,6 +605,9 @@ function cbBuildScen(src)
     sp = num(get(S.scSp));
     t0 = num(get(S.scT));
     tEnd = num(get(S.scEnd));
+    if ~(tEnd > 0)
+        tEnd = defaultHorizon(S.plant);
+    end
     sc = simlab.Scenario('custom', tEnd);
     sc.setpoint(0, 0);
     sc.setpoint(sp, t0);
@@ -638,9 +647,24 @@ end
 
 function cbRun(src)
     S = get_(src);
-    if isempty(S.plant) || isempty(S.ctrl) || isempty(S.scenario)
-        say(S, 'a plant, a controller and a scenario are all required');
+    if isempty(S.plant)
+        say(S, 'apply a plant first (tab 1)');
         return;
+    end
+    % A Run pressed on a half-configured session must still produce a result,
+    % with what was auto-filled printed in the status line. Dead-ends are how
+    % a workbench loses its user.
+    if isempty(S.ctrl)
+        [S.ctrl, S.cfg] = makeDefaultController(S);
+        say(S, 'no controller applied - using IMC on the nominal model: Kp=%.5g Ki=%.5g Kd=%.5g', ...
+            S.cfg.core.kp, S.cfg.core.ki, S.cfg.core.kd);
+    end
+    dt = S.ctrl.getSampleTime();
+    if isempty(S.scenario) || ~(S.scenario.tEnd >= 2 * dt)
+        sp = defaultSetpoint(S.plant);
+        T = max(defaultHorizon(S.plant), 10 * dt);
+        S.scenario = simlab.Scenario.presets('stepResponse', 'sp', sp, 'tEnd', T);
+        say(S, 'no usable scenario - built a step to %.5g over %.5g s', sp, T);
     end
     say(S, 'running...');
     S.plant.reset();
@@ -933,9 +957,65 @@ end
 
 function dt = suggestedDt(pl)
     % A twentieth of the dominant time constant, floored so a fast plant does
-    % not produce an absurdly small step. Suggested, never assumed silently:
-    % every caller either shows it in a field or prints it.
-    dt = max(pl.tau() / 20, 1e-4);
+    % not produce an absurdly small step. An INTEGRATING plant (tank level,
+    % servo position) has no dominant time constant - tau() is Inf - and Inf
+    % is not a sample time: pidx.PID rejects it with ERR_INVALID_DT. Fall
+    % back to 0.1 s and let the operator refine.
+    tau = pl.tau();
+    if ~isfinite(tau) || tau <= 0
+        dt = 0.1;
+    else
+        dt = max(tau / 20, 1e-4);
+    end
+end
+
+function T = defaultHorizon(pl)
+    % A scenario long enough to see the whole response: 12 time constants
+    % plus the dead time. Integrating plants get a finite stand-in, because a
+    % horizon of Inf would make every run a zero-sample run.
+    tau = pl.tau();
+    L = pl.transportDelay();
+    if ~isfinite(tau) || tau <= 0, tau = 10; end
+    if ~isfinite(L)   || L < 0,    L = 0;   end
+    T = max(12 * (tau + L), 1);
+end
+
+function sp = defaultSetpoint(pl)
+    % Half the actuator span mapped through the plant gain: large enough to
+    % be meaningful, small enough not to spend the run saturated.
+    [lo, hi] = pl.actuatorLimits();
+    if ~isfinite(lo), lo = 0; end
+    if ~isfinite(hi), hi = 1; end
+    k = pl.steadyStateGain();
+    if ~isfinite(k) || k <= 0, k = 1; end
+    sp = 0.5 * (hi - lo) * k;
+    if ~isfinite(sp) || sp == 0, sp = 1; end
+end
+
+function [ctrl, cfg] = makeDefaultController(S)
+    % IMC on the nominal model, so a Run pressed before any tuning still has
+    % a controller. A starting point that is printed, not a hidden default.
+    K = pidx.Const;
+    dt = suggestedDt(S.plant);
+    m = pidx.plantModel(K.MODEL_FOPDT, S.plant.steadyStateGain(), ...
+        S.plant.tau(), S.plant.transportDelay());
+    g = [];
+    if isfinite(S.plant.steadyStateGain()) && isfinite(S.plant.tau())
+        [rc, g] = pidx.ruleApply(K.RULE_IMC, m, K.STRUCT_PID, 0);
+        if rc ~= K.OK, g = []; end
+    end
+    if isempty(g)
+        g = struct('kp', 1.0, 'ki', 0.1, 'kd', 0, 'tf', 0);
+    end
+    cfg = pidx.config('kp', g.kp, 'ki', g.ki, 'kd', g.kd, 'dt', dt);
+    if g.tf > 0, cfg.filter.tf = g.tf; end
+    [lo, hi] = S.plant.actuatorLimits();
+    if isfinite(lo) && isfinite(hi)
+        cfg.limits.use_output_limits = true;
+        cfg.limits.output_min = lo;
+        cfg.limits.output_max = hi;
+    end
+    ctrl = pidx.PID(cfg);
 end
 
 function v = num(str)
