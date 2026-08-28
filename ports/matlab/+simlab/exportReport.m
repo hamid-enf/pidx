@@ -74,8 +74,12 @@ function writeCsv(path, r)
 end
 
 function writeJson(path, r, o)
+    % Same rule as exportSTM32: an anonymous function cannot contain an
+    % assignment, so the line accumulator is a nested function.
     L = {};
-    a = @(s) L{end + 1} = s;   %#ok<*AGROW>
+    function a(s)
+        L{end + 1} = s;
+    end
 
     a('{');
     a('  "tool": "simlab.exportReport",');

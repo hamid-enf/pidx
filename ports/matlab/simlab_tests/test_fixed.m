@@ -55,11 +55,13 @@ function T = test_fixed(T)
 
     q.setSetpoint(Q.fToQ15(0.5));
     u = zeros(200, 1);
+    sat = false(200, 1);
     for k = 1:200
         if k - 1 == 100
             q.setSetpoint(Q.fToQ15(-0.3));
         end
         u(k) = double(q.update(ySeq(k)));
+        sat(k) = q.isSaturated();
     end
 
     if haveRef

@@ -75,7 +75,7 @@ function T = test_export(T)
     T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_DT'), cfg.core.sample_time, ...
         1e-9, 'dt');
     T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_TF'), cfg.filter.tf, 1e-9, 'Tf');
-    T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_KT'), cfg.integral.kt, 1e-9, 'Kt');
+    T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_AW_KT'), cfg.integral.kt, 1e-9, 'Kt');
     T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_BETA'), cfg.weight.beta, ...
         1e-9, 'beta');
     T = simlab_tests.near(T, parseDefine(hdr, 'HEATERLOOP_OUT_MAX'), 100, 1e-12, 'output max');
@@ -111,8 +111,10 @@ function T = test_export(T)
     srcMin = fileread(outMin.source);
     T = simlab_tests.ok(T, ~isempty(strfind(srcMin, 'NOT EXPORTED')), ...
         'a dropped feature is marked NOT EXPORTED in the file, not silently omitted');
-    T = simlab_tests.ok(T, ~isempty(strfind(srcMin, 'cfg.safety.enabled')), ...
+    T = simlab_tests.ok(T, ~isempty(strfind(srcMin, 'NOT EXPORTED: safety')), ...
         '...and safety is one of the features MINIMAL does not have');
+    T = simlab_tests.ok(T, isempty(strfind(srcMin, 'cfg.safety.enabled = true')), ...
+        'the MINIMAL source does not configure safety it cannot have');
 
     % ---- 3. it compiles ----
     %

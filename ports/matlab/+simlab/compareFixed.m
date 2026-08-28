@@ -81,13 +81,29 @@ function r = compareFixed(plant, gains, opt)
 
     sc = o.scenario;
     if isempty(sc)
+        % The setpoint comes from the PLANT (half the actuator span mapped
+        % through the gain), not from the measurement range: on a bipolar
+        % range the midpoint is 0, which would "fit" any Q15 range and skip
+        % the refusal the range check exists for.
         sc = simlab.Scenario.presets('stepResponse', ...
-            'sp', 0.5 * (o.measRange(1) + o.measRange(2)));
+            'sp', defaultSetpoint(plant));
     end
 
     % ---- the floating-point loop ----
+    % The derivative filter must also match: the float core derives Tf from
+    % N = 10 when none is given, while PIDq with tf_us = 0 differentiates
+    % raw. Give both the same Tf so D is the same operation on both sides.
+    tfEff = o.tf;
+    if tfEff <= 0 && gains.kd > 0 && gains.kp > 0
+        tfEff = gains.kd / (10 * gains.kp);
+    end
     cfgF = pidx.config('kp', gains.kp, 'ki', gains.ki, 'kd', gains.kd, ...
         'dt', dt);
+    if tfEff > 0
+        cfgF.filter.tf = tfEff;
+    else
+        cfgF.filter.n_filter = 0;
+    end
     cfgF.limits.use_output_limits = true;
     cfgF.limits.output_min = o.outRange(1);
     cfgF.limits.output_max = o.outRange(2);
@@ -104,12 +120,16 @@ function r = compareFixed(plant, gains, opt)
     cfgQ.ki_q16 = gq.ki_q16;
     cfgQ.kd_q16 = gq.kd_q16;
     cfgQ.dt_us = uint32(round(dt * 1e6));
-    cfgQ.tf_us = uint32(round(o.tf * 1e6));
+    cfgQ.tf_us = uint32(round(tfEff * 1e6));
     cfgQ.out_min_q15 = su.toQ15(o.outRange(1));
     cfgQ.out_max_q15 = su.toQ15(o.outRange(2));
     cfgQ.i_min_q15 = su.toQ15(o.outRange(1));
     cfgQ.i_max_q15 = su.toQ15(o.outRange(2));
-    cfgQ.aw_mode = simlab.PIDq.AW_BACK_CALC;
+    % CLAMP on both sides: identical math, so any remaining difference is
+    % the number FORMAT, which is the only thing this study may measure.
+    % (Back-calculation differs by design between the float core and PIDq -
+    % a power-of-two shift vs kt*dt - and would dominate the trace diff.)
+    cfgQ.aw_mode = simlab.PIDq.AW_CLAMP;
     cfgQ.bc_shift = o.bcShift;
     cfgQ.lpf_shift = o.lpfShift;
 
