@@ -419,8 +419,7 @@ function showPlantInfo(S)
     for i = 1:numel(cav)
         L{end + 1} = sprintf('  - %s', cav{i});
     end
-    set(S.plantInfo, 'String', strjoin(wrap(L), sprintf('
-')));
+    set(S.plantInfo, 'String', strjoin(wrap(L), sprintf('\n')));
 end
 
 function cbPlantInfo(src)
@@ -688,8 +687,7 @@ function showCtrlInfo(S, txt)
     else
         L{end + 1} = 'output    UNLIMITED - the integrator can wind up without bound';
     end
-    set(S.ctrlInfo, 'String', strjoin(wrap(L), sprintf('
-')));
+    set(S.ctrlInfo, 'String', strjoin(wrap(L), sprintf('\n')));
 end
 
 % ===========================================================================
@@ -709,8 +707,7 @@ function cbScPreset(src)
         say(S, 'duration was not usable - using %.5g s (12x tau+L)', tEnd);
     end
     S.scenario = simlab.Scenario.presets(which, 'sp', sp, 'tEnd', tEnd);
-    set(S.scList, 'String', strjoin(wrap(cellstr(S.scenario.describe())), sprintf('
-')));
+    set(S.scList, 'String', strjoin(wrap(cellstr(S.scenario.describe())), sprintf('\n')));
     say(S, 'scenario "%s" built - %d events over %.4g s', which, ...
         S.scenario.nEvents, S.scenario.tEnd);
     put_(src, S);
@@ -846,8 +843,7 @@ function cbMC(src)
         L{end + 1} = 'At or above 90%: the tuning survives a model that is';
         L{end + 1} = 'up to 2x wrong in any parameter.';
     end
-    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
-')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('\n')));
     say(S, 'Monte Carlo done: %.0f%% survived', 100 * mc.share);
     put_(src, S);
 end
@@ -894,8 +890,7 @@ function cbRules(src)
     L{end + 1} = cr.rankCorrelationNote;
     L{end + 1} = '';
     L{end + 1} = cr.recommend;
-    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
-')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('\n')));
     say(S, 'rule comparison done - see figure 93');
     put_(src, S);
 end
@@ -931,8 +926,7 @@ function showRunInfo(S)
     L{end + 1} = '';
     L{end + 1} = 'SCENARIO';
     L{end + 1} = S.result.scenario;
-    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
-')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('\n')));
 end
 
 % ===========================================================================
