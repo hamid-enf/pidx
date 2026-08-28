@@ -260,7 +260,12 @@ classdef Plant < handle
             o.t = 0; o.dt = 0; o.nUpdates = 0;
             o.yTrue = 0; o.yMeas = 0; o.uCmd = 0; o.uPlant = 0;
 
-            o.xs = zeros(size(o.ad_a, 1), 1);
+            % fopdt holds ONE state; a linear plant holds one per pole.
+            % zeros(size(o.ad_a,1),1) gives the FOPDT an EMPTY state (ad_a is
+            % empty until a c2d runs) and the first update dies on xs(1).
+            % stepLinear() widens this scalar whenever the linear model needs
+            % more, so a plain 0 is the right seed for every kind.
+            o.xs = 0;
             o.m_i = 0; o.m_w = 0; o.m_theta = 0;
             o.x_cust = o.x0;
 
@@ -571,7 +576,7 @@ classdef Plant < handle
             if o.s_stuck
                 w{end + 1} = 'sensor is currently stuck at a fixed value';
             end
-            if o.kind == 'dc_motor'
+            if strcmp(o.kind, 'dc_motor')
                 w{end + 1} = ['DC motor: analysed as the linear speed/voltage ' ...
                               'model. Coulomb friction and load torque are not in it.'];
             end
@@ -677,7 +682,12 @@ classdef Plant < handle
                 d = c2d(sys, dt, 'zoh');
                 [o.ad_a, o.ad_b, o.ad_c, o.ad_d] = ssdata(d);
                 if isempty(o.xs) || numel(o.xs) ~= size(o.ad_a, 1)
-                    o.xs = zeros(size(o.ad_a, 1), 1);
+                    % fopdt holds ONE state; a linear plant holds one per pole.
+            % zeros(size(o.ad_a,1),1) gives the FOPDT an EMPTY state (ad_a is
+            % empty until a c2d runs) and the first update dies on xs(1).
+            % stepLinear() widens this scalar whenever the linear model needs
+            % more, so a plain 0 is the right seed for every kind.
+            o.xs = 0;
                 end
                 o.ad_dt = dt;
             end

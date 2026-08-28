@@ -41,8 +41,8 @@ function c = hilCompare(rSim, rHil, opt)
 
     if nargin < 3, opt = struct(); end
     o = fillOpt(opt, 'fig', 95);
-    o = fillOpt(opt, 'tol', []);
-    o = fillOpt(opt, 'noPlot', false);
+    o = fillOpt(o, 'tol', []);
+    o = fillOpt(o, 'noPlot', false);
 
     c = struct();
 
@@ -282,7 +282,7 @@ function h = plotCompare(t, yS, yH, uS, uH, dy, du, tolY, tolU, c, fignum)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

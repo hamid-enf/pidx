@@ -175,7 +175,7 @@ function cbApplyPlant(src)
     adcmax = str2double(get(S.adcmax, 'String'));
     sdelay = str2double(get(S.sdelay, 'String'));
 
-    if isnan([K, tau, L]) || tau <= 0
+    if any(isnan([K, tau, L])) || tau <= 0
         say(S, 'K and tau must be numbers and tau must be > 0');
         return;
     end
@@ -683,9 +683,10 @@ function cbMC(src)
         say(S, 'a plant and a controller are required');
         return;
     end
-    n = str2double(inputdlg('How many perturbed plants?', 'Monte Carlo', ...
-        1, {'60'}));
-    if isempty(n), return; end
+    n = inputdlg('How many perturbed plants?', 'Monte Carlo', 1, {'60'});
+    if isempty(n)
+        return;          % Cancel was pressed
+    end
     n = str2double(n{1});
     if isnan(n) || n < 2, n = 60; end
 

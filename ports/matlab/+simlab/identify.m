@@ -59,7 +59,7 @@ function m = identify(data, opt)
 
     if nargin < 2, opt = struct(); end
     o = fillOpt(opt, 'uStep', []);
-    o = fillOpt(opt, 'u0', []);
+    o = fillOpt(o, 'u0', []);
     m = pidx.plantModel(pidx.Const.MODEL_FOPDT);
     m.quality = uint8(0);
 
@@ -411,7 +411,7 @@ function s = noiseEstimate(y)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

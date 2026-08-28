@@ -218,7 +218,18 @@ def lint_file(path):
             problems.append("%s: first statement is not the primary function" % path)
 
     # bracket balance across the whole file
-    joined = " ".join(t for _, t in lls)
+    code_all = " ".join(t for _, t in lls)
+    joined = code_all
+
+    # The fillOpt anti-pattern: `o = fillOpt(opt, ...)` REBUILDS o from opt on
+    # every call, so a chain of them keeps only the last option. The first
+    # call may build from opt; every later one must merge into o. This exact
+    # bug shipped once and cost compareRules its seed field under real
+    # MATLAB (R2025b), which is how it was found.
+    if len(re.findall(r"\bo = fillOpt\(opt,", code_all)) > 1:
+        problems.append(
+            "%s: fillOpt called on `opt` more than once - every call after "
+            "the first wipes the previous options; pass `o` instead" % path)
     for op, cl, name in (("(", ")", "parentheses"), ("[", "]", "brackets"),
                          ("{", "}", "braces")):
         # a bare `(` inside a string would skew this; strings were stripped

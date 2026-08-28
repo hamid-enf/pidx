@@ -42,12 +42,12 @@ function r = monteCarlo(plant, gains, opt)
 
     if nargin < 3, opt = struct(); end
     o = fillOpt(opt, 'nRuns', 60);
-    o = fillOpt(opt, 'spread', 2.0);
-    o = fillOpt(opt, 'scenario', []);
-    o = fillOpt(opt, 'gainsSpread', 1.0);
-    o = fillOpt(opt, 'seed', 1);
-    o = fillOpt(opt, 'verbose', true);
-    o = fillOpt(opt, 'dt', []);
+    o = fillOpt(o, 'spread', 2.0);
+    o = fillOpt(o, 'scenario', []);
+    o = fillOpt(o, 'gainsSpread', 1.0);
+    o = fillOpt(o, 'seed', 1);
+    o = fillOpt(o, 'verbose', true);
+    o = fillOpt(o, 'dt', []);
 
     rng(o.seed, 'twister');
 
@@ -121,7 +121,7 @@ end
 
 % ---------------------------------------------------------------------------
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

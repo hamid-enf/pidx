@@ -29,11 +29,11 @@ function out = exportReport(r, opt)
 
     if nargin < 2, opt = struct(); end
     o = fillOpt(opt, 'dir', fullfile(pwd, 'simlab_export'));
-    o = fillOpt(opt, 'name', sprintf('run_%s', datestr(now, 'yyyymmdd_HHMMSS')));
-    o = fillOpt(opt, 'sens', []);
-    o = fillOpt(opt, 'cfg', []);
-    o = fillOpt(opt, 'plant', []);
-    o = fillOpt(opt, 'tune', []);
+    o = fillOpt(o, 'name', sprintf('run_%s', datestr(now, 'yyyymmdd_HHMMSS')));
+    o = fillOpt(o, 'sens', []);
+    o = fillOpt(o, 'cfg', []);
+    o = fillOpt(o, 'plant', []);
+    o = fillOpt(o, 'tune', []);
 
     if ~exist(o.dir, 'dir')
         mkdir(o.dir);
@@ -236,7 +236,7 @@ function s = transcript(r)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

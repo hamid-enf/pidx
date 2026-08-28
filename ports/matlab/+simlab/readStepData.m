@@ -37,12 +37,12 @@ function d = readStepData(path, opt)
 
     if nargin < 2, opt = struct(); end
     o = fillOpt(opt, 'header', []);
-    o = fillOpt(opt, 'tCol', []);
-    o = fillOpt(opt, 'yCol', []);
-    o = fillOpt(opt, 'uCol', []);
-    o = fillOpt(opt, 'timeUnit', 's');
-    o = fillOpt(opt, 'delimiter', []);
-    o = fillOpt(opt, 'decimate', 1);
+    o = fillOpt(o, 'tCol', []);
+    o = fillOpt(o, 'yCol', []);
+    o = fillOpt(o, 'uCol', []);
+    o = fillOpt(o, 'timeUnit', 's');
+    o = fillOpt(o, 'delimiter', []);
+    o = fillOpt(o, 'decimate', 1);
 
     if exist(path, 'file') ~= 2
         error('simlab:readStepData:noFile', 'no such file: %s', path);
@@ -281,7 +281,7 @@ function s = tern(c, a, b)
     if c, s = a; else, s = b; end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

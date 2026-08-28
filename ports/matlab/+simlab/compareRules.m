@@ -56,15 +56,15 @@ function r = compareRules(plant, opt)
     K = pidx.Const;
 
     o = fillOpt(opt, 'model', []);
-    o = fillOpt(opt, 'mode', 'robust');
-    o = fillOpt(opt, 'nRuns', 30);
-    o = fillOpt(opt, 'structure', K.STRUCT_PID);
-    o = fillOpt(opt, 'lambda', 0);
-    o = fillOpt(opt, 'scenario', []);
-    o = fillOpt(opt, 'spread', 2.0);
-    o = fillOpt(opt, 'seed', 1);
-    o = fillOpt(opt, 'verbose', true);
-    o = fillOpt(opt, 'dt', []);
+    o = fillOpt(o, 'mode', 'robust');
+    o = fillOpt(o, 'nRuns', 30);
+    o = fillOpt(o, 'structure', K.STRUCT_PID);
+    o = fillOpt(o, 'lambda', 0);
+    o = fillOpt(o, 'scenario', []);
+    o = fillOpt(o, 'spread', 2.0);
+    o = fillOpt(o, 'seed', 1);
+    o = fillOpt(o, 'verbose', true);
+    o = fillOpt(o, 'dt', []);
 
     rng(o.seed, 'twister');
 
@@ -344,7 +344,7 @@ function r = pearson(x, y)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

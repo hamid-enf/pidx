@@ -36,13 +36,13 @@ function r = compareFixed(plant, gains, opt)
 
     if nargin < 3, opt = struct(); end
     o = fillOpt(opt, 'measRange', []);
-    o = fillOpt(opt, 'outRange', []);
-    o = fillOpt(opt, 'dt', []);
-    o = fillOpt(opt, 'scenario', []);
-    o = fillOpt(opt, 'tf', 0);
-    o = fillOpt(opt, 'bcShift', 4);
-    o = fillOpt(opt, 'lpfShift', 0);
-    o = fillOpt(opt, 'verbose', true);
+    o = fillOpt(o, 'outRange', []);
+    o = fillOpt(o, 'dt', []);
+    o = fillOpt(o, 'scenario', []);
+    o = fillOpt(o, 'tf', 0);
+    o = fillOpt(o, 'bcShift', 4);
+    o = fillOpt(o, 'lpfShift', 0);
+    o = fillOpt(o, 'verbose', true);
 
     % ---- ranges: from the plant where it knows, otherwise asked for ----
     if isempty(o.outRange)
@@ -263,7 +263,7 @@ function sp = scSetpoint(sc)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

@@ -41,9 +41,9 @@ function h = hilConnect(opt)
 
     if nargin < 1, opt = struct(); end
     o = fillOpt(opt, 'port', defaultPort());
-    o = fillOpt(opt, 'baud', 115200);
-    o = fillOpt(opt, 'timeout', 1.0);
-    o = fillOpt(opt, 'quiet', false);
+    o = fillOpt(o, 'baud', 115200);
+    o = fillOpt(o, 'timeout', 1.0);
+    o = fillOpt(o, 'quiet', false);
 
     h = struct();
     h.port = o.port;

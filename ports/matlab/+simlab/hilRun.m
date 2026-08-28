@@ -40,14 +40,14 @@ function r = hilRun(h, plant, scenario, opt)
 
     if nargin < 4, opt = struct(); end
     o = fillOpt(opt, 'setpoint', []);
-    o = fillOpt(opt, 'spAt', []);
-    o = fillOpt(opt, 'dt', []);
-    o = fillOpt(opt, 'kp', []);
-    o = fillOpt(opt, 'ki', []);
-    o = fillOpt(opt, 'kd', []);
-    o = fillOpt(opt, 'tf', []);
-    o = fillOpt(opt, 'maxTimeouts', 5);
-    o = fillOpt(opt, 'verbose', true);
+    o = fillOpt(o, 'spAt', []);
+    o = fillOpt(o, 'dt', []);
+    o = fillOpt(o, 'kp', []);
+    o = fillOpt(o, 'ki', []);
+    o = fillOpt(o, 'kd', []);
+    o = fillOpt(o, 'tf', []);
+    o = fillOpt(o, 'maxTimeouts', 5);
+    o = fillOpt(o, 'verbose', true);
 
     % ---- the setpoint ----
     sp = o.setpoint;
@@ -264,7 +264,7 @@ function [sp, spAt] = scenarioSetpoint(sc)
     end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else

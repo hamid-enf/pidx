@@ -68,12 +68,12 @@ function d = designByGoal(plant, goal, opt)
     K = pidx.Const;
 
     o = fillOpt(opt, 'model', []);
-    o = fillOpt(opt, 'dt', []);
-    o = fillOpt(opt, 'scenario', []);
-    o = fillOpt(opt, 'structure', K.STRUCT_PID);
-    o = fillOpt(opt, 'nLambda', 25);
-    o = fillOpt(opt, 'searchBeta', true);
-    o = fillOpt(opt, 'verbose', true);
+    o = fillOpt(o, 'dt', []);
+    o = fillOpt(o, 'scenario', []);
+    o = fillOpt(o, 'structure', K.STRUCT_PID);
+    o = fillOpt(o, 'nLambda', 25);
+    o = fillOpt(o, 'searchBeta', true);
+    o = fillOpt(o, 'verbose', true);
 
     dt = o.dt;
     if isempty(dt), dt = plant.dt; end
@@ -450,7 +450,7 @@ function s = tern(c, a, b)
     if c, s = a; else, s = b; end
 end
 
-function o = fillOpt(opt, name, default)
+function o = fillOpt(o, name, default)
     if isfield(opt, name) && ~isempty(opt.(name))
         o.(name) = opt.(name);
     else
