@@ -1,77 +1,317 @@
 function simlabApp()
-%SIMLABAPP  Graphical front end for the PIDX simulation tool.
+%SIMLABAPP  Graphical workbench for the PIDX simulation tool.
 %
 %   simlabApp
 %
-% Built on classic figure/uitabgroup/uicontrol rather than App Designer on
-% purpose: it then runs in any MATLAB from the last fifteen years AND in GNU
-% Octave with a graphics toolkit, with no .mlapp file to carry around and no
-% App Designer dependency. Every control here is a plain callback into the
-% same +simlab functions the console wizard and the scripts call, so the GUI
-% cannot produce a number the rest of the tool would not.
+% Five tabs over one engine: everything here calls the same +simlab functions
+% the scripts and the test suite use, so a number seen in the GUI is a number
+% the tests would vouch for.
 %
-% TABS
-%   Plant      choose a preset or type K / tau / L, and set the sensor and
-%              actuator realism. "Open-loop test" plots the step response.
-%   Controller gains, anti-windup, derivative source, limits, 2DOF weights.
-%              "Identify" runs the relay or step auto-tuner and fills the
-%              gain fields with what it found.
-%   Scenario   a preset plus the three events that matter most, listed as
-%              they will fire.
-%   Run        runs it, plots it, and prints the metrics, the margins and the
-%              verdict. Monte Carlo and rule comparison live here too.
-%   Export     writes the C for STM32CubeIDE and the CSV/JSON report.
+% LAYOUT NOTES
+%   Every control uses NORMALIZED units, so the window can be resized and
+%   nothing overflows it - the first real session showed the old pixel layout
+%   spilling the export panel past the window edge. Sections sit in titled
+%   panels with one palette; the status line at the bottom is where every
+%   auto-filled decision is announced.
 %
-% If no display is available this says so and points at simlab_wizard, which
-% does the same job without a window.
+%   Runs in plain MATLAB (classic uicontrol, no App Designer) and in Octave
+%   with a graphics toolkit.
 
-    if ~usejava('jvm') && isempty(getenv('DISPLAY'))
-        error('simlab:app:noDisplay', ...
-            ['no display available. Use simlab_wizard for the same ' ...
-             'workflow without a window.']);
-    end
-
+    K = pidx.Const;
     S = struct();
-    S.plant = [];
-    S.cfg = [];
-    S.ctrl = [];
-    S.scenario = [];
-    S.result = [];
-    S.sens = [];
-    S.tune = [];
 
-    S.f = figure('Name', sprintf('PIDX simlab  -  library %s', ...
-        pidx.Const.VERSION_STRING), ...
-        'NumberTitle', 'off', 'MenuBar', 'none', 'Color', [0.94 0.94 0.94], ...
-        'Position', [80 80 980 660], 'Resize', 'on');
+    fig = figure('Name', 'PIDX simlab', 'NumberTitle', 'off', ...
+        'MenuBar', 'none', 'ToolBar', 'none', ...
+        'Color', PAL.bg, 'Position', [60 60 1180 760], ...
+        'Resize', 'on');
+    S.f = fig;
 
-    tg = uitabgroup('Parent', S.f, 'Units', 'normalized', ...
-        'Position', [0.01 0.02 0.98 0.96]);
+    % ---- header band ----
+    uicontrol('Parent', fig, 'Style', 'text', 'Units', 'normalized', ...
+        'Position', [0 0.955 1 0.045], 'BackgroundColor', PAL.dark, ...
+        'ForegroundColor', 'w', 'FontSize', 12, 'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'left', 'String', ...
+        sprintf('    PIDX simlab  -  simulation & tuning workbench    library %s', ...
+                K.VERSION_STRING));
 
-    S.tabPlant = uitab(tg, 'Title', '1 Plant');
-    S.tabCtrl = uitab(tg, 'Title', '2 Controller');
-    S.tabScen = uitab(tg, 'Title', '3 Scenario');
-    S.tabRun = uitab(tg, 'Title', '4 Run');
-    S.tabExport = uitab(tg, 'Title', '5 Export');
+    % ---- status line ----
+    S.status = uicontrol('Parent', fig, 'Style', 'text', 'Units', 'normalized', ...
+        'Position', [0 0 1 0.035], 'BackgroundColor', PAL.status, ...
+        'HorizontalAlignment', 'left', 'FontSize', 10, 'String', ' ');
 
-    % Structs are pass-by-value: each build adds its control handles to ITS
-    % copy and returns it. Chaining the returns is what makes the final
-    % setappdata carry every field - the original version saved main's
-    % field-less copy over the builds' copies, and the first callback died on
-    % a missing field. Found by the first real MATLAB session.
+    % ---- tabs ----
+    tg = uitabgroup('Parent', fig, 'Units', 'normalized', ...
+        'Position', [0.008 0.045 0.984 0.902]);
+    S.tabPlant = uitab(tg, 'Title', '1  Plant');
+    S.tabCtrl = uitab(tg, 'Title', '2  Controller');
+    S.tabScen = uitab(tg, 'Title', '3  Scenario');
+    S.tabRun = uitab(tg, 'Title', '4  Run');
+    S.tabExport = uitab(tg, 'Title', '5  Export');
+
     S = buildPlantTab(S);
     S = buildCtrlTab(S);
     S = buildScenTab(S);
     S = buildRunTab(S);
     S = buildExportTab(S);
 
-    setappdata(S.f, 'simlabState', S);
-    refreshAll(S.f);
+    setappdata(fig, 'simlabState', S);
+    refreshAll(fig);
 end
 
 % ===========================================================================
-% State access
+% Palette and control factory - one look everywhere
 % ===========================================================================
+
+function P = palette()
+    P.bg = [0.955 0.960 0.970];     % window / panel background
+    P.dark = [0.100 0.200 0.340];   % header
+    P.status = [0.880 0.910 0.950]; % status line
+    P.edge = [0.760 0.790 0.830];   % panel borders
+    P.btn = [0.860 0.900 0.950];    % ordinary buttons
+    P.go = [0.130 0.420 0.660];     % primary action
+    P.warn = [0.850 0.550 0.200];
+end
+
+function P = PAL
+    % MATLAB cannot call a function before it is defined in a script-like
+    % file, but local functions are visible to the whole file, so the
+    % palette is just a function; this one-line alias keeps call sites short.
+    P = palette();
+end
+
+function h = panel(parent, title, x, y, w, ht)
+    P = PAL;
+    h = uipanel('Parent', parent, 'Title', title, 'Units', 'normalized', ...
+        'Position', [x y w ht], 'BackgroundColor', P.bg, ...
+        'BorderColor', P.edge, 'BorderType', 'line', ...
+        'FontSize', 10, 'FontWeight', 'bold', 'TitlePosition', 'lefttop');
+end
+
+function h = lbl(parent, txt, x, y, w)
+    P = PAL;
+    h = uicontrol('Parent', parent, 'Style', 'text', 'Units', 'normalized', ...
+        'Position', [x y w 0.05], 'String', txt, ...
+        'HorizontalAlignment', 'left', 'BackgroundColor', P.bg, ...
+        'FontSize', 10);
+end
+
+function h = ed(parent, x, y, w, def)
+    h = uicontrol('Parent', parent, 'Style', 'edit', 'Units', 'normalized', ...
+        'Position', [x y w 0.052], 'String', def, ...
+        'HorizontalAlignment', 'right', 'BackgroundColor', 'w', ...
+        'FontSize', 10);
+end
+
+function h = pop(parent, items, x, y, w)
+    h = uicontrol('Parent', parent, 'Style', 'popupmenu', ...
+        'Units', 'normalized', 'Position', [x y w 0.058], ...
+        'String', items, 'BackgroundColor', 'w', 'FontSize', 10);
+end
+
+function h = btn(parent, txt, x, y, w, ht, cb, primary)
+    P = PAL;
+    if nargin >= 8 && primary
+        bg = P.go; fg = 'w';
+    else
+        bg = P.btn; fg = 'k';
+    end
+    h = uicontrol('Parent', parent, 'Style', 'pushbutton', ...
+        'Units', 'normalized', 'Position', [x y w ht], 'String', txt, ...
+        'Callback', cb, 'BackgroundColor', bg, 'ForegroundColor', fg, ...
+        'FontSize', 10, 'FontWeight', 'bold');
+end
+
+function h = infoBox(parent, x, y, w, ht)
+    h = uicontrol('Parent', parent, 'Style', 'edit', 'Units', 'normalized', ...
+        'Position', [x y w ht], 'Max', 2, 'Enable', 'inactive', ...
+        'BackgroundColor', 'w', 'HorizontalAlignment', 'left', ...
+        'FontSize', 9, 'FontName', 'Consolas');
+end
+
+function s = wrap(s, width)
+% Wrap long lines so the info boxes never clip a compile command in half.
+    if nargin < 2, width = 96; end
+    out = {};
+    for k = 1:numel(s)
+        line = s{k};
+        while numel(line) > width
+            cut = find(line(1:width) == ' ', 1, 'last');
+            if isempty(cut), cut = width; end
+            out{end + 1} = line(1:cut); %#ok<AGROW>
+            line = ['    ', line(cut + 1:end)];
+        end
+        out{end + 1} = line; %#ok<AGROW>
+    end
+    s = out;
+end
+
+% ===========================================================================
+% Tab 1 - Plant
+% ===========================================================================
+
+function S = buildPlantTab(S)
+    p = S.tabPlant;
+
+    pa = panel(p, 'Process model', 0.015, 0.52, 0.46, 0.45);
+    lbl(pa, 'preset', 0.04, 0.86, 0.2);
+    S.plantPreset = pop(pa, {'heater', 'extruder', 'flowValve', 'pressure', ...
+        'level', 'dcMotor', 'servoPos', 'slowThermal'}, 0.26, 0.85, 0.4);
+    rows = {'K (static gain)', 'K', '0'; ...
+            'tau (time constant, s)', 'tau', '0'; ...
+            'L (dead time, s)', 'L', '0'};
+    y = 0.70;
+    for i = 1:size(rows, 1)
+        lbl(pa, rows{i, 1}, 0.04, y, 0.45);
+        S.(rows{i, 2}) = ed(pa, 0.55, y, 0.22, rows{i, 3});
+        y = y - 0.13;
+    end
+    btn(pa, 'Apply plant', 0.04, 0.10, 0.35, 0.10, @(s, e) cbApplyPlant(s), true);
+    btn(pa, 'Open-loop step test', 0.45, 0.10, 0.42, 0.10, @(s, e) cbOpenLoop(s));
+
+    pb = panel(p, 'Actuator & sensor realism', 0.015, 0.03, 0.46, 0.46);
+    rowsB = {'actuator min', 'umin', '0'; 'actuator max', 'umax', '0'; ...
+             'noise sigma', 'sigma', '0'; 'ADC bits', 'bits', '0'; ...
+             'ADC min', 'adcmin', '0'; 'ADC max', 'adcmax', '0'; ...
+             'sensor delay (s)', 'sdelay', '0'};
+    y = 0.84;
+    for i = 1:size(rowsB, 1)
+        lbl(pb, rowsB{i, 1}, 0.04, y, 0.42);
+        S.(rowsB{i, 2}) = ed(pb, 0.55, y, 0.22, rowsB{i, 3});
+        y = y - 0.12;
+    end
+    btn(pb, 'Model info', 0.04, 0.02, 0.30, 0.10, @(s, e) cbPlantInfo(s));
+
+    lbl(p, 'what the model is, and what a linear analysis cannot see', ...
+        0.49, 0.965, 0.5);
+    S.plantInfo = infoBox(p, 0.49, 0.03, 0.495, 0.93);
+end
+
+% ===========================================================================
+% Tab 2 - Controller
+% ===========================================================================
+
+function S = buildCtrlTab(S)
+    p = S.tabCtrl;
+
+    pa = panel(p, 'Gains & timing', 0.015, 0.52, 0.46, 0.45);
+    rows = {'dt (sample time, s)', 'dt', '0'; 'Kp', 'Kp', '0'; ...
+            'Ki', 'Ki', '0'; 'Kd', 'Kd', '0'; 'Tf (0 = Td/10)', 'Tf', '0'};
+    y = 0.82;
+    for i = 1:size(rows, 1)
+        lbl(pa, rows{i, 1}, 0.04, y, 0.45);
+        S.(rows{i, 2}) = ed(pa, 0.55, y, 0.22, rows{i, 3});
+        y = y - 0.13;
+    end
+    lbl(pa, 'integration', 0.04, 0.14, 0.3);
+    S.imethod = pop(pa, {'backward Euler', 'trapezoidal'}, 0.36, 0.13, 0.4);
+
+    pb = panel(p, 'Structure, limits, anti-windup', 0.015, 0.03, 0.46, 0.46);
+    rowsB = {'out min', 'omin', '0'; 'out max', 'omax', '0'; ...
+             'beta (2DOF)', 'beta', '1'; 'gamma', 'gamma', '0'; ...
+             'input LPF tau', 'lpf', '0'};
+    y = 0.84;
+    for i = 1:size(rowsB, 1)
+        lbl(pb, rowsB{i, 1}, 0.04, y, 0.42);
+        S.(rowsB{i, 2}) = ed(pb, 0.55, y, 0.22, rowsB{i, 3});
+        y = y - 0.115;
+    end
+    lbl(pb, 'anti-windup', 0.04, 0.24, 0.3);
+    S.aw = pop(pb, {'CLAMP', 'CONDITIONAL', 'BACK_CALCULATION', ...
+        'TRACKING', 'NONE'}, 0.36, 0.23, 0.5);
+    lbl(pb, 'derivative on', 0.04, 0.12, 0.3);
+    S.dmode = pop(pb, {'measurement', 'error', 'weighted error'}, ...
+        0.36, 0.11, 0.5);
+
+    pc = panel(p, 'Actions', 0.49, 0.72, 0.22, 0.25);
+    btn(pc, 'Apply controller', 0.06, 0.62, 0.88, 0.22, @(s, e) cbApplyCtrl(s), true);
+    btn(pc, 'Identify (auto-tune)', 0.06, 0.36, 0.88, 0.22, @(s, e) cbTune(s));
+    btn(pc, 'Suggest gains (IMC)', 0.06, 0.10, 0.88, 0.22, @(s, e) cbSuggest(s));
+
+    lbl(p, 'what will be applied, and why', 0.725, 0.965, 0.27);
+    S.ctrlInfo = infoBox(p, 0.725, 0.03, 0.26, 0.93);
+end
+
+% ===========================================================================
+% Tab 3 - Scenario
+% ===========================================================================
+
+function S = buildScenTab(S)
+    p = S.tabScen;
+
+    pa = panel(p, 'Preset & horizon', 0.015, 0.52, 0.46, 0.45);
+    lbl(pa, 'preset', 0.04, 0.86, 0.2);
+    S.scPreset = pop(pa, {'stepResponse', 'disturbance', 'windup', 'noise', ...
+        'sensorFault', 'agingPlant', 'setpointProfile'}, 0.26, 0.85, 0.45);
+    rows = {'setpoint', 'scSp', '100'; 'step at t (s)', 'scT', '1'; ...
+            'duration (s)', 'scEnd', '60'};
+    y = 0.68;
+    for i = 1:size(rows, 1)
+        lbl(pa, rows{i, 1}, 0.04, y, 0.45);
+        S.(rows{i, 2}) = ed(pa, 0.55, y, 0.22, rows{i, 3});
+        y = y - 0.14;
+    end
+    btn(pa, 'Load preset', 0.04, 0.10, 0.35, 0.11, @(s, e) cbScPreset(s), true);
+
+    pb = panel(p, 'Extra events', 0.015, 0.03, 0.46, 0.46);
+    rowsB = {'disturbance size', 'scDist', '0'; ...
+             'disturbance at t (s)', 'scDistT', '30'; ...
+             'noise sigma', 'scNoise', '0'; ...
+             'noise from t (s)', 'scNoiseT', '30'};
+    y = 0.80;
+    for i = 1:size(rowsB, 1)
+        lbl(pb, rowsB{i, 1}, 0.04, y, 0.45);
+        S.(rowsB{i, 2}) = ed(pb, 0.55, y, 0.22, rowsB{i, 3});
+        y = y - 0.14;
+    end
+    btn(pb, 'Build custom scenario', 0.04, 0.08, 0.5, 0.12, @(s, e) cbBuildScen(s));
+
+    lbl(p, 'the script of events, in the order they fire', 0.49, 0.965, 0.5);
+    S.scList = infoBox(p, 0.49, 0.03, 0.495, 0.93);
+end
+
+% ===========================================================================
+% Tab 4 - Run
+% ===========================================================================
+
+function S = buildRunTab(S)
+    p = S.tabRun;
+
+    pa = panel(p, 'Actions', 0.015, 0.80, 0.97, 0.17);
+    btn(pa, 'RUN', 0.015, 0.25, 0.14, 0.5, @(s, e) cbRun(s), true);
+    btn(pa, 'Monte Carlo', 0.175, 0.25, 0.16, 0.5, @(s, e) cbMC(s));
+    btn(pa, 'Compare 9 rules', 0.355, 0.25, 0.16, 0.5, @(s, e) cbRules(s));
+    btn(pa, 'Re-plot', 0.535, 0.25, 0.12, 0.5, @(s, e) cbReplot(s));
+
+    S.runInfo = infoBox(p, 0.015, 0.03, 0.97, 0.75);
+end
+
+% ===========================================================================
+% Tab 5 - Export
+% ===========================================================================
+
+function S = buildExportTab(S)
+    p = S.tabExport;
+
+    pa = panel(p, 'Target', 0.015, 0.55, 0.40, 0.42);
+    lbl(pa, 'output directory', 0.04, 0.84, 0.3);
+    S.expDir = ed(pa, 0.34, 0.84, 0.5, fullfile(pwd, 'simlab_export'));
+    S.expDir = S.expDir;  % edit control; left-aligned text reads better
+    set(S.expDir, 'HorizontalAlignment', 'left');
+    btn(pa, 'browse...', 0.85, 0.84, 0.11, 0.06, @(s, e) cbBrowse(s));
+    lbl(pa, 'C symbol prefix', 0.04, 0.66, 0.3);
+    S.expSym = ed(pa, 0.34, 0.66, 0.3, 'pidxLoop');
+    set(S.expSym, 'HorizontalAlignment', 'left');
+    lbl(pa, 'PIDX profile', 0.04, 0.48, 0.3);
+    S.expProf = pop(pa, {'FULL', 'PROCESS', 'MOTION', 'MINIMAL'}, ...
+        0.34, 0.47, 0.3);
+    btn(pa, 'Export C for STM32CubeIDE', 0.04, 0.16, 0.6, 0.13, ...
+        @(s, e) cbExport(s), true);
+    btn(pa, 'Also write CSV + JSON report', 0.04, 0.03, 0.6, 0.10, ...
+        @(s, e) cbReport(s));
+
+    lbl(p, 'what was written, and how to wire it', 0.435, 0.965, 0.55);
+    S.expInfo = infoBox(p, 0.435, 0.03, 0.55, 0.93);
+end
 
 function S = get_(src)
     f = ancestor(src, 'figure');
@@ -91,52 +331,6 @@ end
 % ===========================================================================
 % Tab 1: plant
 % ===========================================================================
-
-function S = buildPlantTab(S)
-    p = S.tabPlant;
-
-    uicontrol(p, 'Style', 'text', 'String', 'preset', ...
-        'HorizontalAlignment', 'left', 'Position', [20 590 60 20]);
-    S.plantPreset = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'heater', 'extruder', 'flowValve', 'pressure', 'level', ...
-                   'dcMotor', 'servoPos', 'slowThermal'}, ...
-        'Position', [85 590 150 24], ...
-        'Callback', @(src, ev) cbPreset(src));
-
-    labels = {'K (static gain)', 'tau (time constant, s)', 'L (dead time, s)', ...
-              'actuator min', 'actuator max', 'noise sigma', 'ADC bits', ...
-              'ADC min', 'ADC max', 'sensor delay (s)'};
-    fields = {'K', 'tau', 'L', 'umin', 'umax', 'sigma', 'bits', ...
-              'adcmin', 'adcmax', 'sdelay'};
-    y = 545;
-    for i = 1:numel(labels)
-        uicontrol(p, 'Style', 'text', 'String', labels{i}, ...
-            'HorizontalAlignment', 'left', 'Position', [20 y 150 18]);
-        S.(fields{i}) = uicontrol(p, 'Style', 'edit', 'String', '0', ...
-            'HorizontalAlignment', 'right', 'Position', [180 y 90 22]);
-        y = y - 28;
-    end
-
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Apply plant', ...
-        'Position', [300 545 130 30], 'Callback', @(s, e) cbApplyPlant(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Open-loop step test', ...
-        'Position', [300 505 130 30], 'Callback', @(s, e) cbOpenLoop(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Model info', ...
-        'Position', [300 465 130 30], 'Callback', @(s, e) cbPlantInfo(s));
-
-    % 'Max', 2 (with the default 'Min' of 0) is the classic-uicontrol way to
-    % get a MULTI-LINE edit box. MaxLines is an App Designer property and
-    % does not exist here - using it made the whole app die on the first tab
-    % under real MATLAB (R2025b), which is how it was found.
-    S.plantInfo = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
-        'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
-        'BackgroundColor', 'w', 'Position', [300 60 640 390], 'String', '');
-
-    S.status = uicontrol(p, 'Style', 'text', 'String', '', ...
-        'HorizontalAlignment', 'left', 'ForegroundColor', [0.1 0.2 0.6], ...
-        'Position', [20 20 920 24]);
-
-end
 
 function cbPreset(src)
     S = get_(src);
@@ -198,6 +392,7 @@ function cbApplyPlant(src)
 end
 
 function showPlantInfo(S)
+    % (lines are wrapped at the end so long caveats never clip)
     if isempty(S.plant)
         set(S.plantInfo, 'String', 'no plant yet');
         return;
@@ -224,7 +419,8 @@ function showPlantInfo(S)
     for i = 1:numel(cav)
         L{end + 1} = sprintf('  - %s', cav{i});
     end
-    set(S.plantInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.plantInfo, 'String', strjoin(wrap(L), sprintf('
+')));
 end
 
 function cbPlantInfo(src)
@@ -263,56 +459,6 @@ end
 % ===========================================================================
 % Tab 2: controller
 % ===========================================================================
-
-function S = buildCtrlTab(S)
-    p = S.tabCtrl;
-    labels = {'dt (sample time, s)', 'Kp', 'Ki', 'Kd', 'Tf (0 = Td/10)', ...
-              'out min', 'out max', 'beta', 'gamma', 'input LPF tau'};
-    fields = {'dt', 'Kp', 'Ki', 'Kd', 'Tf', 'omin', 'omax', 'beta', ...
-              'gamma', 'lpf'};
-    y = 560;
-    for i = 1:numel(labels)
-        uicontrol(p, 'Style', 'text', 'String', labels{i}, ...
-            'HorizontalAlignment', 'left', 'Position', [20 y 130 18]);
-        S.(fields{i}) = uicontrol(p, 'Style', 'edit', 'String', '0', ...
-            'HorizontalAlignment', 'right', 'Position', [160 y 90 22]);
-        y = y - 28;
-    end
-
-    % Two fields must NOT start at zero. beta = 0 removes the proportional
-    % action on the setpoint - a silent 2DOF retune nobody asked for - so it
-    % starts at its honest default of 1. (dt is pre-filled by the preset
-    % loader on tab 1 and by Identify / Suggest here.)
-    set(S.beta, 'String', '1');
-
-    uicontrol(p, 'Style', 'text', 'String', 'anti-windup', ...
-        'HorizontalAlignment', 'left', 'Position', [20 y 130 18]);
-    S.aw = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'CLAMP', 'CONDITIONAL', 'BACK_CALCULATION', 'TRACKING', 'NONE'}, ...
-        'Position', [160 y 150 24]);
-    y = y - 28;
-    uicontrol(p, 'Style', 'text', 'String', 'derivative on', ...
-        'HorizontalAlignment', 'left', 'Position', [20 y 130 18]);
-    S.dmode = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'measurement', 'error', 'weighted error'}, ...
-        'Position', [160 y 150 24]);
-    y = y - 28;
-    uicontrol(p, 'Style', 'text', 'String', 'integration', ...
-        'HorizontalAlignment', 'left', 'Position', [20 y 130 18]);
-    S.imethod = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'backward Euler', 'trapezoidal'}, 'Position', [160 y 150 24]);
-
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Apply controller', ...
-        'Position', [360 560 140 30], 'Callback', @(s, e) cbApplyCtrl(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Identify (auto-tune)...', ...
-        'Position', [360 520 140 30], 'Callback', @(s, e) cbTune(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Suggest gains (IMC)', ...
-        'Position', [360 480 140 30], 'Callback', @(s, e) cbSuggest(s));
-
-    S.ctrlInfo = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
-        'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
-        'BackgroundColor', 'w', 'Position', [360 60 580 400], 'String', '');
-end
 
 function cbApplyCtrl(src)
     S = get_(src);
@@ -542,44 +688,13 @@ function showCtrlInfo(S, txt)
     else
         L{end + 1} = 'output    UNLIMITED - the integrator can wind up without bound';
     end
-    set(S.ctrlInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.ctrlInfo, 'String', strjoin(wrap(L), sprintf('
+')));
 end
 
 % ===========================================================================
 % Tab 3: scenario
 % ===========================================================================
-
-function S = buildScenTab(S)
-    p = S.tabScen;
-    uicontrol(p, 'Style', 'text', 'String', 'preset', ...
-        'HorizontalAlignment', 'left', 'Position', [20 590 60 20]);
-    S.scPreset = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'stepResponse', 'disturbance', 'windup', 'noise', ...
-                   'sensorFault', 'agingPlant', 'setpointProfile'}, ...
-        'Position', [85 590 150 24], 'Callback', @(s, e) cbScPreset(s));
-
-    labels = {'setpoint', 'step at t (s)', 'duration (s)', ...
-              'disturbance size', 'disturbance at t (s)', ...
-              'noise sigma', 'noise from t (s)'};
-    fields = {'scSp', 'scT', 'scEnd', 'scDist', 'scDistT', 'scNoise', 'scNoiseT'};
-    defaults = {'100', '1', '60', '0', '30', '0', '30'};
-    y = 545;
-    for i = 1:numel(labels)
-        uicontrol(p, 'Style', 'text', 'String', labels{i}, ...
-            'HorizontalAlignment', 'left', 'Position', [20 y 150 18]);
-        S.(fields{i}) = uicontrol(p, 'Style', 'edit', 'String', defaults{i}, ...
-            'HorizontalAlignment', 'right', 'Position', [180 y 90 22]);
-        y = y - 28;
-    end
-
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Build scenario', ...
-        'Position', [300 545 130 30], 'Callback', @(s, e) cbBuildScen(s));
-
-    S.scList = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
-        'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
-        'BackgroundColor', 'w', 'Position', [300 60 640 460], ...
-        'String', 'no scenario yet');
-end
 
 function cbScPreset(src)
     S = get_(src);
@@ -594,7 +709,8 @@ function cbScPreset(src)
         say(S, 'duration was not usable - using %.5g s (12x tau+L)', tEnd);
     end
     S.scenario = simlab.Scenario.presets(which, 'sp', sp, 'tEnd', tEnd);
-    set(S.scList, 'String', S.scenario.describe());
+    set(S.scList, 'String', strjoin(wrap(cellstr(S.scenario.describe())), sprintf('
+')));
     say(S, 'scenario "%s" built - %d events over %.4g s', which, ...
         S.scenario.nEvents, S.scenario.tEnd);
     put_(src, S);
@@ -626,24 +742,6 @@ end
 % ===========================================================================
 % Tab 4: run
 % ===========================================================================
-
-function S = buildRunTab(S)
-    p = S.tabRun;
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'RUN', ...
-        'FontSize', 12, 'Position', [20 570 120 36], ...
-        'Callback', @(s, e) cbRun(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Monte Carlo...', ...
-        'Position', [150 570 120 30], 'Callback', @(s, e) cbMC(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Compare 9 rules...', ...
-        'Position', [280 570 120 30], 'Callback', @(s, e) cbRules(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Re-plot', ...
-        'Position', [410 570 90 30], 'Callback', @(s, e) cbReplot(s));
-
-    S.runInfo = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
-        'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
-        'BackgroundColor', 'w', 'Position', [20 60 920 490], ...
-        'String', 'set a plant, a controller and a scenario, then press RUN.');
-end
 
 function cbRun(src)
     S = get_(src);
@@ -748,7 +846,8 @@ function cbMC(src)
         L{end + 1} = 'At or above 90%: the tuning survives a model that is';
         L{end + 1} = 'up to 2x wrong in any parameter.';
     end
-    set(S.runInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
+')));
     say(S, 'Monte Carlo done: %.0f%% survived', 100 * mc.share);
     put_(src, S);
 end
@@ -795,7 +894,8 @@ function cbRules(src)
     L{end + 1} = cr.rankCorrelationNote;
     L{end + 1} = '';
     L{end + 1} = cr.recommend;
-    set(S.runInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
+')));
     say(S, 'rule comparison done - see figure 93');
     put_(src, S);
 end
@@ -831,44 +931,13 @@ function showRunInfo(S)
     L{end + 1} = '';
     L{end + 1} = 'SCENARIO';
     L{end + 1} = S.result.scenario;
-    set(S.runInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.runInfo, 'String', strjoin(wrap(L), sprintf('
+')));
 end
 
 % ===========================================================================
 % Tab 5: export
 % ===========================================================================
-
-function S = buildExportTab(S)
-    p = S.tabExport;
-    uicontrol(p, 'Style', 'text', 'String', 'output directory', ...
-        'HorizontalAlignment', 'left', 'Position', [20 590 120 20]);
-    S.expDir = uicontrol(p, 'Style', 'edit', 'String', fullfile(pwd, 'simlab_export'), ...
-        'HorizontalAlignment', 'left', 'Position', [150 590 500 24]);
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'browse...', ...
-        'Position', [660 590 80 24], 'Callback', @(s, e) cbBrowse(s));
-
-    uicontrol(p, 'Style', 'text', 'String', 'C symbol prefix', ...
-        'HorizontalAlignment', 'left', 'Position', [20 555 120 20]);
-    S.expSym = uicontrol(p, 'Style', 'edit', 'String', 'pidxLoop', ...
-        'HorizontalAlignment', 'left', 'Position', [150 555 200 24]);
-
-    uicontrol(p, 'Style', 'text', 'String', 'PIDX profile', ...
-        'HorizontalAlignment', 'left', 'Position', [20 520 120 20]);
-    S.expProf = uicontrol(p, 'Style', 'popupmenu', ...
-        'String', {'FULL', 'PROCESS', 'MOTION', 'MINIMAL'}, ...
-        'Position', [150 520 150 24]);
-
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Export C for STM32CubeIDE', ...
-        'FontSize', 11, 'Position', [20 460 240 34], ...
-        'Callback', @(s, e) cbExport(s));
-    uicontrol(p, 'Style', 'pushbutton', 'String', 'Also write CSV + JSON report', ...
-        'Position', [20 415 240 28], 'Callback', @(s, e) cbReport(s));
-
-    S.expInfo = uicontrol(p, 'Style', 'edit', 'Max', 2, ...
-        'HorizontalAlignment', 'left', 'Enable', 'inactive', ...
-        'BackgroundColor', 'w', 'Position', [290 60 650 560], ...
-        'String', '');
-end
 
 function cbBrowse(src)
     S = get_(src);
@@ -921,7 +990,7 @@ function cbExport(src)
     L{end + 1} = '';
     L{end + 1} = 'The generated file is verified to compile and to reproduce';
     L{end + 1} = 'the MATLAB output by simlab_tests/test_export.m.';
-    set(S.expInfo, 'String', strjoin(L, sprintf('\n')));
+    set(S.expInfo, 'String', strjoin(wrap(L), sprintf('\n')));
     say(S, 'exported to %s', out.dir);
     put_(src, S);
 end
